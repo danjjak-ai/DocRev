@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 가이드 문서 관리 - DocRev</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(229, 231, 235, 0.5);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen text-gray-800 flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="material-icons text-indigo-600 text-3xl">library_books</span>
+                <h1
+                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
+                    RAG 가이드 문서 관리</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="pdf_comment_workspace.html"
+                    class="flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                    <span class="material-icons text-sm">arrow_back</span>
+                    <span class="text-sm font-medium">워크스페이스로 돌아가기</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-4xl mx-auto w-full px-4 py-8">
+        <div class="glass-panel rounded-2xl p-8 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-800 mb-6">가이드 문서 목록 (config/ReferenceDoc)</h2>
+
+            <div class="mb-6 flex gap-4">
+                <input type="file" id="fileInput" accept=".pdf"
+                    class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all cursor-pointer" />
+                <button onclick="uploadFile()"
+                    class="px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl transition-all font-medium whitespace-nowrap">
+                    업로드
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
+                <ul id="docList" class="divide-y divide-gray-100">
+                    <!-- Files will be listed here -->
+                </ul>
+            </div>
+
+            <div class="border-t border-gray-200 pt-8">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">RAG 데이터베이스 재구성</h3>
+                        <p class="text-sm text-gray-500 mt-1">업로드된 문서들을 기반으로 AI 분석용 RAG 데이터베이스(Vector Store)를 최신화합니다.
+                            성능에 따라 수 분이 소요될 수 있습니다.</p>
+                    </div>
+                </div>
+
+                <button id="reconstructBtn" onclick="startReconstruction()"
+                    class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl hover:from-violet-700 hover:to-indigo-700 transition-all font-medium">
+                    <span class="material-icons">autorenew</span>
+                    <span>RAG 재구성 시작</span>
+                </button>
+
+                <!-- Status Container -->
+                <div id="statusContainer" class="hidden mt-4 p-4 rounded-xl border">
+                    <div class="flex items-start gap-3">
+                        <span id="statusIcon" class="material-icons mt-0.5 animate-spin text-indigo-500">sync</span>
+                        <div>
+                            <p id="statusMessage" class="font-medium text-gray-800">RAG 재구성을 시작했습니다...</p>
+                            <p id="processedFiles" class="text-sm text-gray-500 mt-1 hidden"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast"
+        class="fixed bottom-4 right-4 transform translate-y-full opacity-0 transition-all duration-300 bg-gray-800 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50">
+        <span class="material-icons text-green-400" id="toastIcon">check_circle</span>
+        <span id="toastMessage" class="font-medium">알림 메시지</span>
+    </div>
+
+    <script>
+        let pollingInterval = null;
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            document.getElementById('toastIcon').textContent = isError ? 'error' : 'check_circle';
+            document.getElementById('toastIcon').className = `material-icons ${isError ? 'text-red-400' : 'text-green-400'}`;
+
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-full', 'opacity-0'), 3000);
+        }
+
+        async function loadDocs() {
+            try {
+                const response = await fetch('http://localhost:5000/api/reference-docs');
+                const files = await response.json();
+                const list = document.getElementById('docList');
+                list.innerHTML = '';
+
+                if (files.length === 0) {
+                    list.innerHTML = '<li class="px-6 py-8 text-center text-gray-500">업로드된 참조 문서가 없습니다.</li>';
+                    return;
+                }
+
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.className = 'px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors';
+                    li.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <span class="material-icons text-red-500">picture_as_pdf</span>
+                            <span class="font-medium text-gray-700">${file}</span>
+                        </div>
+                        <button onclick="deleteFile('${file}')" class="text-gray-400 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50" title="삭제">
+                            <span class="material-icons">delete</span>
+                        </button>
+                    `;
+                    list.appendChild(li);
+                });
+            } catch (error) {
+                console.error('Error loading docs:', error);
+                showToast('문서 목록을 불러오지 못했습니다.', true);
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                showToast('업로드할 파일을 선택하세요.', true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('http://localhost:5000/api/reference-docs/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('파일이 성공적으로 업로드되었습니다.');
+                    fileInput.value = '';
+                    loadDocs();
+                } else {
+                    showToast(result.error || '업로드 실패', true);
+                }
+            } catch (error) {
+                showToast('업로드 중 오류가 발생했습니다.', true);
+            }
+        }
+
+        async function deleteFile(filename) {
+            if (!confirm(`'${filename}' 파일을 삭제하시겠습니까?`)) return;
+
+            try {
+                const response = await fetch(`http://localhost:5000/api/reference-docs/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showToast('파일이 삭제되었습니다.');
+                    loadDocs();
+                } else {
+                    const result = await response.json();
+                    showToast(result.error || '삭제 실패', true);
+                }
+            } catch (error) {
+                showToast('삭제 중 오류가 발생했습니다.', true);
+            }
+        }
+
+        async function startReconstruction() {
+            try {
+                const response = await fetch('http://localhost:5000/api/rag/reconstruct', { method: 'POST' });
+                if (response.ok) {
+                    setUIRunningState(true);
+                    pollStatus();
+                } else {
+                    const result = await response.json();
+                    showToast(result.error || 'RAG 재구성 시작 실패', true);
+                }
+            } catch (error) {
+                showToast('서버 통신 오류. 백엔드가 실행 중인지 확인하세요.', true);
+            }
+        }
+
+        async function pollStatus() {
+            if (pollingInterval) clearInterval(pollingInterval);
+
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('http://localhost:5000/api/rag/status');
+                    const status = await response.json();
+
+                    if (!status.is_running && status.message) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        setUICompletedState(status);
+                    }
+                } catch (error) {
+                    console.error('Error polling status:', error);
+                }
+            }, 2000);
+        }
+
+        function setUIRunningState(isRunning) {
+            const btn = document.getElementById('reconstructBtn');
+            const container = document.getElementById('statusContainer');
+            const icon = document.getElementById('statusIcon');
+            const msg = document.getElementById('statusMessage');
+            const processedFiles = document.getElementById('processedFiles');
+
+            if (isRunning) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                container.classList.remove('hidden', 'bg-green-50', 'border-green-200', 'bg-red-50', 'border-red-200');
+                container.classList.add('bg-indigo-50', 'border-indigo-200');
+                icon.textContent = 'sync';
+                icon.classList.add('animate-spin', 'text-indigo-500');
+                icon.classList.remove('text-green-500', 'text-red-500');
+                msg.textContent = 'RAG 재구성을 진행 중입니다. 잠시만 기다려주세요...';
+                processedFiles.classList.add('hidden');
+            }
+        }
+
+        function setUICompletedState(status) {
+            const btn = document.getElementById('reconstructBtn');
+            const container = document.getElementById('statusContainer');
+            const icon = document.getElementById('statusIcon');
+            const msg = document.getElementById('statusMessage');
+            const processedFiles = document.getElementById('processedFiles');
+
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            container.classList.remove('bg-indigo-50', 'border-indigo-200');
+
+            icon.classList.remove('animate-spin', 'text-indigo-500');
+
+            Object.assign(msg.style, { color: '' }); // reset
+
+            if (status.message && status.message.includes("오류")) {
+                container.classList.add('bg-red-50', 'border-red-200');
+                icon.classList.add('text-red-500');
+                icon.textContent = 'error';
+                msg.classList.add('text-red-800');
+            } else {
+                container.classList.add('bg-green-50', 'border-green-200');
+                icon.classList.add('text-green-500');
+                icon.textContent = 'check_circle';
+                msg.classList.remove('text-red-800');
+            }
+
+            msg.textContent = status.message || 'RAG 재구성이 완료되었습니다.';
+
+            if (status.files_processed && status.files_processed.length > 0) {
+                processedFiles.textContent = '처리된 파일: ' + status.files_processed.join(', ');
+                processedFiles.classList.remove('hidden');
+            }
+
+            showToast('RAG 상태가 업데이트되었습니다.');
+        }
+
+        // Initialize state by checking if already running
+        fetch('http://localhost:5000/api/rag/status')
+            .then(res => res.json())
+            .then(status => {
+                if (status.is_running) {
+                    setUIRunningState(true);
+                    pollStatus();
+                } else if (status.message) {
+                    // Show previous status without starting polling
+                    document.getElementById('statusContainer').classList.remove('hidden');
+                    setUICompletedState(status);
+                }
+            })
+            .catch(e => console.log('Backend not ready or status fetch failed', e));
+
+        loadDocs();
+    </script>
+</body>
+
+</html>

@@ -12,8 +12,12 @@ ENV/
 *.py[cod]
 *$py.class
 
-# Database
+# Database and RAG Data
 chroma_db/
+config/vector_store/*
+config/ReferenceDoc/*
+!config/vector_store/.gitkeep
+!config/ReferenceDoc/.gitkeep
 
 # OS specific
 .DS_Store

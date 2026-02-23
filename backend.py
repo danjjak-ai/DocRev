@@ -11,6 +11,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+import unicodedata
+import re
+from langchain_community.retrievers import BM25Retriever
 
 app = Flask(__name__)
 # Enable CORS for all domains
@@ -221,15 +224,26 @@ def update_prompts():
     return jsonify({"error": "Failed to save prompts"}), 500
 
 # Initialize RAG components
-# Use intfloat/multilingual-e5-small for better multilingual support
-embeddings = HuggingFaceEmbeddings(model_name="intfloat/multilingual-e5-small")
-# Use in-memory ChromaDB for now (persistence can be added by providing persist_directory)
+# Use pkshatech/GLuCoSE-base-ja for superior Japanese support
+embeddings = HuggingFaceEmbeddings(model_name="pkshatech/GLuCoSE-base-ja")
+# Use persistent ChromaDB
+PERSIST_DIR = os.path.join(os.path.dirname(__file__), "config", "vector_store")
 vector_store = None
+bm25_retriever = None
 
 # Reference Document Configuration and State
 REF_DOCS_DIR = os.path.join(os.path.dirname(__file__), "config", "ReferenceDoc")
 os.makedirs(REF_DOCS_DIR, exist_ok=True)
 RAG_STATUS = {"is_running": False, "message": "", "files_processed": []}
+
+def normalize_japanese_text(text):
+    """Normalizes Japanese text to NFC and handles full-width/half-width conversions."""
+    return unicodedata.normalize('NFKC', text)
+
+def tokenize_japanese_simple(text):
+    """Simple tokenizer for Japanese BM25 (splitting by whitespace and non-alphanumeric)."""
+    # Using a simple regex to match words/characters for BM25
+    return re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text)
 
 @app.route('/api/reference-docs', methods=['GET'])
 def list_reference_docs():
@@ -270,13 +284,14 @@ def get_rag_status():
     return jsonify(RAG_STATUS)
 
 def reconstruct_rag_task():
-    global vector_store, RAG_STATUS
+    global vector_store, bm25_retriever, RAG_STATUS
     try:
         documents = []
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
             length_function=len,
+            separators=["\n\n", "\n", "。", "！", "？", " ", ""]
         )
         files_processed = []
 
@@ -297,10 +312,20 @@ def reconstruct_rag_task():
                     files_processed.append(filename)
         
         if documents:
-            vector_store = Chroma.from_documents(documents=documents, embedding=embeddings)
+            vector_store = Chroma.from_documents(
+                documents=documents, 
+                embedding=embeddings,
+                persist_directory=PERSIST_DIR
+            )
+            # Initialize BM25 for hybrid search
+            bm25_retriever = BM25Retriever.from_documents(
+                documents,
+                preprocess_func=tokenize_japanese_simple
+            )
             RAG_STATUS["message"] = f"RAG 재구성이 완료되었습니다. (총 {len(documents)}개 청크 생성)"
         else:
             vector_store = None
+            bm25_retriever = None
             RAG_STATUS["message"] = "참조 문서가 없어 RAG 데이터베이스를 초기화했습니다."
             
         RAG_STATUS["files_processed"] = files_processed
@@ -366,15 +391,62 @@ def index_pdf_text(doc_id, pages_text_list):
     
     print(f"Indexed {len(documents)} chunks from document {doc_id}.")
 
-def retrieve_relevant_context(query, k=3):
+def retrieve_relevant_context(query, k=5):
     """
-    Retrieves the most relevant chunks for a given query.
+    Retrieves the most relevant chunks using Hybrid Search (Vector + BM25).
     """
     if vector_store is None:
         return []
         
-    results = vector_store.similarity_search(query, k=k)
-    return results
+    # Vector search
+    vector_results = vector_store.similarity_search(query, k=k)
+    
+    # BM25 search
+    bm25_results = []
+    if bm25_retriever:
+        bm25_retriever.k = k
+        bm25_results = bm25_retriever.get_relevant_documents(query)
+    
+    # Simple Reciprocal Rank Fusion or duplicate removal
+    seen = set()
+    combined = []
+    
+    # Combine results, prioritizing vector search for now
+    for doc in vector_results:
+        content_hash = hash(doc.page_content)
+        if content_hash not in seen:
+            combined.append(doc)
+            seen.add(content_hash)
+            
+    for doc in bm25_results:
+        content_hash = hash(doc.page_content)
+        if content_hash not in seen:
+            combined.append(doc)
+            seen.add(content_hash)
+            
+    return combined[:k]
+
+def expand_query_with_gemini(query, lang='ko'):
+    """Uses Gemini to expand the search query for better RAG retrieval."""
+    if not api_key:
+        return query
+        
+    expansion_prompt = f"""
+    You are an AI assistant specialized in document retrieval. 
+    Expand the following user question into a better search query for a RAG system.
+    Focus on relevant keywords, especially in Japanese if applicable.
+    Respond ONLY with the expanded query string, no explanation.
+    
+    User Question: {query}
+    Language: {lang}
+    """
+    try:
+        response = model.generate_content(expansion_prompt)
+        expanded = response.text.strip()
+        print(f"Original Query: {query} -> Expanded: {expanded}")
+        return expanded
+    except:
+        return query
 
 @app.route('/upload', methods=['POST'])
 def upload_pdf():
@@ -446,9 +518,10 @@ def upload_pdf():
 
         # --- Level 2: RAG Analysis (Guidelines) ---
         if mode in ['level2', 'both']:
-            # Retrieve relevant context using the Sales Guideline topics
-            guideline_query = "판매정보제공 가이드라인 허위 과장 비방 금지"
-            relevant_docs = retrieve_relevant_context(guideline_query, k=5)
+            # Retrieve relevant context using the Sales Guideline topics, with query expansion
+            base_query = "판매정보제공 가이드라인 허위 과장 비방 금지"
+            expanded_guideline_query = expand_query_with_gemini(base_query, lang=lang)
+            relevant_docs = retrieve_relevant_context(expanded_guideline_query, k=7)
             retrieved_context = "\n\n".join([f"[Source Fragment]: {d.page_content}" for d in relevant_docs])
 
             # Determine prompt
@@ -525,8 +598,9 @@ def chat_with_document():
         if not chat_prompt_template:
              return jsonify({"error": f"No chat prompt found for language: {lang}"}), 500
 
-        # 1. 문서에서 관련 컨텍스트 검색
-        relevant_docs = retrieve_relevant_context(query, k=5)
+        # 1. 문서에서 관련 컨텍스트 검색 (Query Expansion 적용)
+        expanded_query = expand_query_with_gemini(query, lang=lang)
+        relevant_docs = retrieve_relevant_context(expanded_query, k=7)
         context = "\n\n".join([f"[Context]: {d.page_content}" for d in relevant_docs])
 
         # 2. Gemini에게 문서 기반 답변 요청

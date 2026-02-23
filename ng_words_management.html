@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>금지어 관리 - PDF Review Workspace</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Noto+Sans+KR:wght@300;400;500;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3b82f6",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "Noto Sans KR", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+    <style type="text/tailwindcss">
+        body { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+
+<body
+    class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200">
+    <div class="max-w-4xl mx-auto p-4 sm:p-8">
+        <header class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-primary p-2 rounded-lg text-white">
+                    <span class="material-symbols-outlined">block</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">금지어 관리</h1>
+                    <p class="text-xs text-slate-500">문서 분석 시 필터링할 금지어를 관리하세요</p>
+                </div>
+            </div>
+            <a href="pdf_comment_workspace.html"
+                class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
+                워크스페이스로 돌아가기
+            </a>
+        </header>
+
+        <main class="space-y-6">
+            <!-- Add New Word Section -->
+            <section
+                class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary !text-[18px]">add_circle</span>
+                    새 금지어 추가
+                </h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase">금지어</label>
+                            <input id="new-word-input" type="text" placeholder="예: 최고, No.1"
+                                class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase">가이드라인 조항</label>
+                            <input id="new-rule-input" type="text" placeholder="예: 가이드라인 제1의 3-(2)-①"
+                                class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase">수정 제안 (가이드라인 위반 이유 추천 문구)</label>
+                        <textarea id="new-suggestion-input" rows="2" placeholder="사용자에게 표시될 수정 권고 문구를 입력하세요..."
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"></textarea>
+                    </div>
+                    <div class="flex justify-end">
+                        <button id="add-word-btn"
+                            class="bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined !text-[18px]">add</span>
+                            추가하기
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Words List Section -->
+            <section
+                class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <h2 class="text-sm font-semibold flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
+                        현재 금지어 목록
+                    </h2>
+                    <span id="word-count"
+                        class="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0개</span>
+                </div>
+                <!-- Table Header -->
+                <div class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
+                    <div class="col-span-3">금지어</div>
+                    <div class="col-span-3">가이드라인 조항</div>
+                    <div class="col-span-5">수정 제안</div>
+                    <div class="col-span-1 text-right">작업</div>
+                </div>
+                <div id="words-list"
+                    class="divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <!-- Dynamic Items -->
+                </div>
+                <!-- Empty State -->
+                <div id="empty-state" class="hidden py-12 text-center">
+                    <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
+                    <p class="text-sm text-slate-500">등록된 금지어가 없습니다.</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="mt-8 text-center">
+            <p class="text-[10px] text-slate-400">© 2024 PDF Annotation Workspace • Config Management Module</p>
+        </footer>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal"
+        class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div
+            class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h3 class="font-bold text-lg">금지어 수정</h3>
+                <button id="close-modal" class="text-slate-400 hover:text-slate-600"><span
+                        class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase">기존 단어</label>
+                        <p id="old-word-display"
+                            class="bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 text-sm opacity-60">
+                        </p>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase">새 단어</label>
+                        <input id="edit-word-input" type="text"
+                            class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary">
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-slate-400 uppercase">가이드라인 조항</label>
+                    <input id="edit-rule-input" type="text"
+                        class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-slate-400 uppercase">수정 제안</label>
+                    <textarea id="edit-suggestion-input" rows="3"
+                        class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary"></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
+                <button id="cancel-edit"
+                    class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">취소</button>
+                <button id="save-edit"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-600 rounded-lg transition-colors">저장하기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:5000/api/ng-words";
+        const wordsList = document.getElementById('words-list');
+        const emptyState = document.getElementById('empty-state');
+        const wordCount = document.getElementById('word-count');
+        
+        const newWordInput = document.getElementById('new-word-input');
+        const newRuleInput = document.getElementById('new-rule-input');
+        const newSuggestionInput = document.getElementById('new-suggestion-input');
+        const addWordBtn = document.getElementById('add-word-btn');
+
+        const editModal = document.getElementById('edit-modal');
+        const editWordInput = document.getElementById('edit-word-input');
+        const editRuleInput = document.getElementById('edit-rule-input');
+        const editSuggestionInput = document.getElementById('edit-suggestion-input');
+        const oldWordDisplay = document.getElementById('old-word-display');
+        
+        let currentlyEditing = null;
+        let allWords = [];
+
+        async function fetchWords() {
+            try {
+                const response = await fetch(API_BASE);
+                allWords = await response.json();
+                renderWords(allWords);
+            } catch (err) {
+                console.error("Fetch error:", err);
+                alert("목록을 불러오지 못했습니다.");
+            }
+        }
+
+        function renderWords(words) {
+            wordsList.innerHTML = '';
+            wordCount.textContent = `${words.length}개`;
+
+            if (words.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                words.forEach(item => {
+                    const word = item.word || item; // Fallback for old string format
+                    const rule = item.rule || "-";
+                    const suggestion = item.suggestion || "-";
+                    
+                    const div = document.createElement('div');
+                    div.className = "grid grid-cols-12 gap-4 items-center px-6 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors";
+                    div.innerHTML = `
+                        <div class="col-span-3 text-sm font-semibold text-primary">${word}</div>
+                        <div class="col-span-3 text-xs text-slate-500 truncate" title="${rule}">${rule}</div>
+                        <div class="col-span-5 text-xs text-slate-600 line-clamp-2" title="${suggestion}">${suggestion}</div>
+                        <div class="col-span-1 flex items-center justify-end gap-1">
+                            <button onclick="openEditModal('${word}')" class="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-all">
+                                <span class="material-symbols-outlined !text-[18px]">edit</span>
+                            </button>
+                            <button onclick="deleteWord('${word}')" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">
+                                <span class="material-symbols-outlined !text-[18px]">delete</span>
+                            </button>
+                        </div>
+                    `;
+                    wordsList.appendChild(div);
+                });
+            }
+        }
+
+        async function addWord() {
+            const word = newWordInput.value.trim();
+            const rule = newRuleInput.value.trim();
+            const suggestion = newSuggestionInput.value.trim();
+            
+            if (!word) {
+                alert("금지어를 입력하세요.");
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word, rule, suggestion })
+                });
+
+                if (response.ok) {
+                    newWordInput.value = '';
+                    newRuleInput.value = '';
+                    newSuggestionInput.value = '';
+                    fetchWords();
+                } else {
+                    const err = await response.json();
+                    alert(err.error || "추가 실패");
+                }
+            } catch (err) {
+                console.error("Add error:", err);
+            }
+        }
+
+        async function deleteWord(word) {
+            if (!confirm(`'${word}'을(를) 정말 삭제하시겠습니까?`)) return;
+
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word })
+                });
+
+                if (response.ok) {
+                    fetchWords();
+                } else {
+                    alert("삭제 실패");
+                }
+            } catch (err) {
+                console.error("Delete error:", err);
+            }
+        }
+
+        function openEditModal(word) {
+            const item = allWords.find(i => (i.word || i) === word);
+            if (!item) return;
+
+            currentlyEditing = word;
+            oldWordDisplay.textContent = word;
+            editWordInput.value = word;
+            editRuleInput.value = item.rule || "";
+            editSuggestionInput.value = item.suggestion || "";
+            
+            editModal.classList.remove('hidden');
+            editWordInput.focus();
+        }
+
+        document.getElementById('save-edit').addEventListener('click', async () => {
+            const newWord = editWordInput.value.trim();
+            const newRule = editRuleInput.value.trim();
+            const newSuggestion = editSuggestionInput.value.trim();
+            
+            if (!newWord) {
+                alert("금지어를 입력하세요.");
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        old_word: currentlyEditing, 
+                        new_word: newWord,
+                        rule: newRule,
+                        suggestion: newSuggestion
+                    })
+                });
+
+                if (response.ok) {
+                    editModal.classList.add('hidden');
+                    fetchWords();
+                } else {
+                    const err = await response.json();
+                    alert(err.error || "수정 실패");
+                }
+            } catch (err) {
+                console.error("Edit error:", err);
+            }
+        });
+
+        document.getElementById('close-modal').onclick = () => editModal.classList.add('hidden');
+        document.getElementById('cancel-edit').onclick = () => editModal.classList.add('hidden');
+        addWordBtn.onclick = addWord;
+
+        // Initial Load
+        fetchWords();
+    </script>
+</body>
+</body>
+
+</html>

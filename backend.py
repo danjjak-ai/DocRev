@@ -1,5 +1,7 @@
 import os
 import json
+import threading
+from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import fitz  # PyMuPDF
@@ -223,6 +225,106 @@ def update_prompts():
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/multilingual-e5-small")
 # Use in-memory ChromaDB for now (persistence can be added by providing persist_directory)
 vector_store = None
+
+# Reference Document Configuration and State
+REF_DOCS_DIR = os.path.join(os.path.dirname(__file__), "config", "ReferenceDoc")
+os.makedirs(REF_DOCS_DIR, exist_ok=True)
+RAG_STATUS = {"is_running": False, "message": "", "files_processed": []}
+
+@app.route('/api/reference-docs', methods=['GET'])
+def list_reference_docs():
+    files = []
+    if os.path.exists(REF_DOCS_DIR):
+        for f in os.listdir(REF_DOCS_DIR):
+            if f.lower().endswith('.pdf'):
+                files.append(f)
+    return jsonify(files)
+
+@app.route('/api/reference-docs/upload', methods=['POST'])
+def upload_reference_doc():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"error": "Only PDF files are allowed"}), 400
+    
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(REF_DOCS_DIR, filename)
+    file.save(file_path)
+    return jsonify({"message": f"Successfully uploaded {filename}", "filename": filename}), 200
+
+@app.route('/api/reference-docs/<filename>', methods=['DELETE'])
+def delete_reference_doc(filename):
+    safe_filename = secure_filename(filename)
+    file_path = os.path.join(REF_DOCS_DIR, safe_filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        return jsonify({"message": f"Successfully deleted {safe_filename}"}), 200
+    return jsonify({"error": "File not found"}), 404
+
+@app.route('/api/rag/status', methods=['GET'])
+def get_rag_status():
+    global RAG_STATUS
+    return jsonify(RAG_STATUS)
+
+def reconstruct_rag_task():
+    global vector_store, RAG_STATUS
+    try:
+        documents = []
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+        )
+        files_processed = []
+
+        if os.path.exists(REF_DOCS_DIR):
+            for filename in os.listdir(REF_DOCS_DIR):
+                if filename.lower().endswith('.pdf'):
+                    file_path = os.path.join(REF_DOCS_DIR, filename)
+                    doc = fitz.open(file_path)
+                    for page_num in range(len(doc)):
+                        page = doc.load_page(page_num)
+                        text = page.get_text()
+                        chunks = text_splitter.split_text(text)
+                        for chunk in chunks:
+                            documents.append(Document(
+                                page_content=chunk,
+                                metadata={"page": page_num + 1, "doc_id": filename}
+                            ))
+                    files_processed.append(filename)
+        
+        if documents:
+            vector_store = Chroma.from_documents(documents=documents, embedding=embeddings)
+            RAG_STATUS["message"] = f"RAG 재구성이 완료되었습니다. (총 {len(documents)}개 청크 생성)"
+        else:
+            vector_store = None
+            RAG_STATUS["message"] = "참조 문서가 없어 RAG 데이터베이스를 초기화했습니다."
+            
+        RAG_STATUS["files_processed"] = files_processed
+    except Exception as e:
+        RAG_STATUS["message"] = f"RAG 재구성 중 오류 발생: {str(e)}"
+    finally:
+        RAG_STATUS["is_running"] = False
+
+@app.route('/api/rag/reconstruct', methods=['POST'])
+def trigger_rag_reconstruction():
+    global RAG_STATUS
+    if RAG_STATUS["is_running"]:
+        return jsonify({"error": "RAG reconstruction is already running"}), 409
+    
+    RAG_STATUS["is_running"] = True
+    RAG_STATUS["message"] = "RAG 재구성을 시작했습니다..."
+    RAG_STATUS["files_processed"] = []
+    
+    thread = threading.Thread(target=reconstruct_rag_task)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"message": "RAG reconstruction started"}), 202
+
 
 EXPERT_REVIEW_GUIDELINE = """
 1. 논리적 일관성: 문서 내의 주장들이 서로 상충되지 않는지 확인.

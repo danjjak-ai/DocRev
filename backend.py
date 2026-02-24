@@ -561,7 +561,20 @@ def upload_pdf():
                 
                 # Level 2 결과에 대해서도 텍스트 검색을 통해 rect 정보 추가 시도
                 for ann in ai_annotations:
-                    page_idx = ann.get("page", 1) - 1
+                    # Robust page parsing
+                    try:
+                        page_val = ann.get("page", 1)
+                        if isinstance(page_val, str):
+                            import re
+                            match = re.search(r'\d+', page_val)
+                            page_val = int(match.group()) if match else 1
+                        page_num_actual = int(page_val)
+                        ann["page"] = page_num_actual
+                        page_idx = page_num_actual - 1
+                    except (ValueError, TypeError, AttributeError):
+                        page_idx = 0
+                        ann["page"] = 1
+
                     if 0 <= page_idx < len(doc):
                         page = doc.load_page(page_idx)
                         quote = ann.get("quote", "")

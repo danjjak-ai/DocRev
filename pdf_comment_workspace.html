@@ -959,10 +959,14 @@
                                                     const listContainer = variant.querySelector('section:nth-of-type(2) .flex-1.space-y-2');
                                                     if (listContainer) {
                                                         listContainer.innerHTML = '';
-                                                        annotations.forEach(ann => {
-                                                            const lang = getCurrentLang();
-                                                            const t = translations[lang] || translations['ko'];
 
+                                                        const variantId = variant.id;
+                                                        let variantLang = 'ko';
+                                                        if (variantId === 'variant-en') variantLang = 'en';
+                                                        if (variantId === 'variant-jp') variantLang = 'ja';
+                                                        const t = translations[variantLang] || translations['ko'];
+
+                                                        annotations.forEach(ann => {
                                                             const colors = categoryColors[ann.category] || categoryColors['일반'];
                                                             const isExist = ann.isExisting;
                                                             const badgeStyle = isExist ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300' : `${colors.text} ${colors.badge}`;
@@ -974,7 +978,7 @@
                                                             item.innerHTML = `
                                                                  <div class="flex justify-between items-start mb-1 gap-2">
                                                                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${badgeStyle} break-words whitespace-normal text-left">${badgeLabel}</span>
-                                                                     <span class="text-[10px] text-slate-400 shrink-0">${ann.type === 'text' ? t.allPages : 'P. ' + ann.page}</span>
+                                                                      <span class="text-[10px] text-slate-400 shrink-0">${(ann.page && ann.page !== -1) ? (t.pageFormat ? t.pageFormat.replace('{page}', ann.page) : 'P. ' + ann.page) : t.allPages}</span>
                                                                  </div>
                                                                  <p class="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">${escapeHtml(ann.comment)}</p>
                                                                  ${ann.referenced_text ? `<div class="mt-2 p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-[10px] text-slate-500 italic"><div class="font-bold text-[9px] text-blue-400 uppercase mb-1">${t.referenceLabel}</div>${escapeHtml(ann.referenced_text)}</div>` : ''}
@@ -1840,7 +1844,9 @@
                                                     catGeneral: '일반',
                                                     catUrgent: '긴급',
                                                     aiReviewLabel: 'AI 리뷰',
-                                                    suggestionLabel: '제안'
+                                                    suggestionLabel: '제안',
+                                                    pageLabel: '페이지',
+                                                    pageFormat: '{page} 페이지'
                                                 },
                                                 ja: {
                                                     chatTitle: 'ドキュメント質疑応答',
@@ -1867,7 +1873,9 @@
                                                     catGeneral: '一般',
                                                     catUrgent: '至急',
                                                     aiReviewLabel: 'AIレビュー',
-                                                    suggestionLabel: '提案'
+                                                    suggestionLabel: '提案',
+                                                    pageLabel: 'ページ',
+                                                    pageFormat: '{page} ページ'
                                                 },
                                                 en: {
                                                     chatTitle: 'Document Q&A',
@@ -1884,6 +1892,8 @@
                                                     referenceLabel: 'Reference Text',
                                                     allPages: 'All Pages',
                                                     pageTemplate: 'P. {current} / {total}',
+                                                    pageLabel: 'Page',
+                                                    pageFormat: 'Page {page}',
                                                     noExport: 'No annotations to export.',
                                                     enterComment: 'Please enter an annotation.',
                                                     enterKeyword: 'Please enter a search keyword.',

@@ -575,18 +575,44 @@ def upload_pdf():
                         page_idx = 0
                         ann["page"] = 1
 
+                    quote = ann.get("quote", "").strip()
+                    # Try to find the quote on the suggested page first
                     if 0 <= page_idx < len(doc):
                         page = doc.load_page(page_idx)
-                        quote = ann.get("quote", "")
                         if quote:
                             rects = page.search_for(quote)
                             if rects:
                                 ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
-                        
-                        # Add localized labels for consistency
-                        ann["ai_review_label"] = lang_prompts.get("ai_review_label", "AI 리뷰")
-                        ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
-                        results.append(ann)
+                    
+                    # Fallback 1: search all pages if not found on the suggested page
+                    if quote and "rect" not in ann:
+                        for p_idx in range(len(doc)):
+                            if p_idx == page_idx: continue
+                            pg = doc.load_page(p_idx)
+                            rects = pg.search_for(quote)
+                            if rects:
+                                ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
+                                ann["page"] = p_idx + 1
+                                break
+                    
+                    # Fallback 2: Robust search (prefix search) if still not found
+                    if quote and "rect" not in ann and len(quote) > 10:
+                        prefix = quote[:30] # Try first 30 chars
+                        for p_idx in range(len(doc)):
+                            pg = doc.load_page(p_idx)
+                            rects = pg.search_for(prefix)
+                            if rects:
+                                ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
+                                ann["page"] = p_idx + 1
+                                break
+                    
+                    # Ensure consistent labels and category
+                    ann["ai_review_label"] = lang_prompts.get("ai_review_label", "AI 리뷰")
+                    ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
+                    if not ann.get("category"):
+                        ann["category"] = ann["ai_review_label"]
+                    
+                    results.append(ann)
             except json.JSONDecodeError:
                 print("Failed to parse JSON from Gemini:", response_text)
                 # We still have results from Level 1 if that was run

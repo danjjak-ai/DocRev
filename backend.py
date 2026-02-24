@@ -620,6 +620,55 @@ def chat_with_document():
         print(f"Error in chat endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/search_text', methods=['POST'])
+def search_text_in_pdf():
+    """
+    Search for exact text matches across all pages of the uploaded PDF using PyMuPDF.
+    Returns a list of annotation objects with matched bounding boxes.
+    """
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+
+    file = request.files['file']
+    keyword = request.form.get('keyword', '').strip()
+    category = request.form.get('category', '일반')
+    comment = request.form.get('comment', '')
+
+    if file.filename == '' or not keyword:
+        return jsonify({"error": "File or keyword missing"}), 400
+
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"error": "File must be a PDF"}), 400
+
+    try:
+        pdf_bytes = file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        
+        results = []
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            text_instances = page.search_for(keyword)
+            # Each text_instance is a Rect(x0, y0, x1, y1)
+            for inst in text_instances:
+                ann = {
+                    "id": f"text-search-{page_num}-{inst.x0}-{inst.y0}",
+                    "page": page_num + 1,
+                    "type": "text", # Keep type consistent for frontend
+                    "keyword": keyword,
+                    "category": category,
+                    "comment": comment,
+                    "rect": [inst.x0, inst.y0, inst.x1, inst.y1]
+                }
+                results.append(ann)
+                
+        doc.close()
+        return jsonify(results), 200
+
+    except Exception as e:
+        print(f"Error in text search endpoint: {e}")
+        if 'doc' in locals(): doc.close()
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/ask', methods=['POST'])
 def ask_question():
     """

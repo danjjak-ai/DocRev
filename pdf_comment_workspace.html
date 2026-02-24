@@ -831,7 +831,9 @@
                                                 '금지어': { bg: 'bg-orange-500/40', border: 'border-orange-500', text: 'text-orange-600', badge: 'bg-orange-50' },
                                                 'Forbidden': { bg: 'bg-orange-500/40', border: 'border-orange-500', text: 'text-orange-600', badge: 'bg-orange-50' },
                                                 '禁止用語': { bg: 'bg-orange-500/40', border: 'border-orange-500', text: 'text-orange-600', badge: 'bg-orange-50' },
-                                                '가이드라인 위반': { bg: 'bg-purple-500/30', border: 'border-purple-500', text: 'text-purple-600', badge: 'bg-purple-50' }
+                                                '가이드라인 위반': { bg: 'bg-purple-500/30', border: 'border-purple-500', text: 'text-purple-600', badge: 'bg-purple-50' },
+                                                'Guideline Violation': { bg: 'bg-purple-500/30', border: 'border-purple-500', text: 'text-purple-600', badge: 'bg-purple-50' },
+                                                'ガイドライン違反': { bg: 'bg-purple-500/30', border: 'border-purple-500', text: 'text-purple-600', badge: 'bg-purple-50' }
                                             };
 
                                             const escapeHtml = (unsafe) => {
@@ -1587,74 +1589,74 @@
 
                                                             let targetRects = [];
 
-                                                            if (ann.type === 'area') {
+                                                            if (ann.type === 'area' && ann.rect) {
                                                                 targetRects.push({
-                                                                    x: ann.rect.x * width,
-                                                                    y: height - ((ann.rect.y + ann.rect.h) * height), // pdf-lib y originates from bottom
-                                                                    w: ann.rect.w * width,
-                                                                    h: ann.rect.h * height
+                                                                    x: (ann.rect.x || 0) * width,
+                                                                    y: height - (((ann.rect.y || 0) + (ann.rect.h || 0)) * height),
+                                                                    w: (ann.rect.w || 0) * width,
+                                                                    h: (ann.rect.h || 0) * height
                                                                 });
-                                                            } else if (ann.type === 'rect' || ann.type === 'text') {
-                                                                // AI or Backend returns rect as [x0, y0, x1, y1] where y is from top
-                                                                const [x0, y0, x1, y1] = ann.rect;
-                                                                targetRects.push({
-                                                                    x: x0,
-                                                                    y: height - y1, // flip y-axis for pdf-lib (bottom-up)
-                                                                    w: x1 - x0,
-                                                                    h: y1 - y0
-                                                                });
-                                                                if (targetRects.length === 0) continue;
-
-                                                                // Draw Annotations onto the PDF page native as Annot objects instead of flattened ink
-                                                                for (let rect of targetRects) {
-                                                                    const { PDFName, PDFHexString, PDFString } = PDFLib;
-
-                                                                    let annotDict;
-
-                                                                    const colorArr = [color.red, color.green, color.blue];
-                                                                    const bounds = [rect.x, rect.y, rect.x + rect.w, rect.y + rect.h];
-
-                                                                    if (ann.type === 'text' || ann.type === 'critical' || ann.type === 'suggestion') {
-                                                                        // Use Highlight for text searches and AI reviews
-                                                                        annotDict = pdfDoc.context.obj({
-                                                                            Type: 'Annot',
-                                                                            Subtype: 'Highlight',
-                                                                            Rect: bounds,
-                                                                            QuadPoints: [
-                                                                                rect.x, rect.y + rect.h,          // top left
-                                                                                rect.x + rect.w, rect.y + rect.h, // top right
-                                                                                rect.x, rect.y,                   // bottom left
-                                                                                rect.x + rect.w, rect.y           // bottom right
-                                                                            ],
-                                                                            C: colorArr,
-                                                                            CA: 0.4, // OPACITY 40%
-                                                                            T: PDFString.of(category),
-                                                                            Contents: PDFHexString.fromText(ann.comment || '')
-                                                                        });
-                                                                    } else {
-                                                                        // Use Square for area selections
-                                                                        annotDict = pdfDoc.context.obj({
-                                                                            Type: 'Annot',
-                                                                            Subtype: 'Square',
-                                                                            Rect: bounds,
-                                                                            C: colorArr,
-                                                                            IC: [bgColor.red, bgColor.green, bgColor.blue], // Inner fill color
-                                                                            BS: pdfDoc.context.obj({ W: 2 }), // Border style: width 2
-                                                                            CA: 0.4, // OPACITY 40%
-                                                                            T: PDFString.of(ann.category || ''),
-                                                                            Contents: PDFHexString.fromText(ann.comment || '')
+                                                            } else if ((ann.type === 'rect' || ann.type === 'text' || ann.type === 'critical' || ann.type === 'suggestion') && ann.rect) {
+                                                                try {
+                                                                    const [x0, y0, x1, y1] = Array.isArray(ann.rect) ? ann.rect : [];
+                                                                    if (x0 !== undefined) {
+                                                                        targetRects.push({
+                                                                            x: x0,
+                                                                            y: height - y1,
+                                                                            w: x1 - x0,
+                                                                            h: y1 - y0
                                                                         });
                                                                     }
+                                                                } catch (e) {
+                                                                    console.warn('Malformed rect data:', ann.rect, e);
+                                                                }
+                                                            }
 
-                                                                    const annotRef = pdfDoc.context.register(annotDict);
+                                                            if (targetRects.length === 0) continue;
 
-                                                                    const annotsNode = page.node.get(PDFName.of('Annots'));
-                                                                    if (annotsNode) {
-                                                                        annotsNode.push(annotRef);
-                                                                    } else {
-                                                                        const newAnnots = pdfDoc.context.obj([annotRef]);
-                                                                        page.node.set(PDFName.of('Annots'), newAnnots);
-                                                                    }
+                                                            for (let rect of targetRects) {
+                                                                const { PDFName, PDFHexString, PDFString } = PDFLib;
+                                                                const colorArr = [color.red, color.green, color.blue];
+                                                                const bounds = [rect.x, rect.y, rect.x + rect.w, rect.y + rect.h];
+
+                                                                let annotDict;
+                                                                if (ann.type === 'text' || ann.type === 'critical' || ann.type === 'suggestion' || category.includes('리뷰') || category.includes('Review') || category.includes('レビュー')) {
+                                                                    annotDict = pdfDoc.context.obj({
+                                                                        Type: 'Annot',
+                                                                        Subtype: 'Highlight',
+                                                                        Rect: bounds,
+                                                                        QuadPoints: [
+                                                                            rect.x, rect.y + rect.h,
+                                                                            rect.x + rect.w, rect.y + rect.h,
+                                                                            rect.x, rect.y,
+                                                                            rect.x + rect.w, rect.y
+                                                                        ],
+                                                                        C: colorArr,
+                                                                        CA: 0.4,
+                                                                        T: PDFString.of(category),
+                                                                        Contents: PDFHexString.fromText(ann.comment || '')
+                                                                    });
+                                                                } else {
+                                                                    annotDict = pdfDoc.context.obj({
+                                                                        Type: 'Annot',
+                                                                        Subtype: 'Square',
+                                                                        Rect: bounds,
+                                                                        C: colorArr,
+                                                                        IC: [bgColor.red, bgColor.green, bgColor.blue],
+                                                                        BS: pdfDoc.context.obj({ W: 2 }),
+                                                                        CA: 0.4,
+                                                                        T: PDFString.of(category),
+                                                                        Contents: PDFHexString.fromText(ann.comment || '')
+                                                                    });
+                                                                }
+
+                                                                const annotRef = pdfDoc.context.register(annotDict);
+                                                                const annotsNode = page.node.get(PDFName.of('Annots'));
+                                                                if (annotsNode) {
+                                                                    annotsNode.push(annotRef);
+                                                                } else {
+                                                                    const newAnnots = pdfDoc.context.obj([annotRef]);
+                                                                    page.node.set(PDFName.of('Annots'), newAnnots);
                                                                 }
                                                             }
                                                         }

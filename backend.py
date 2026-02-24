@@ -510,7 +510,9 @@ def upload_pdf():
                             "clause": rule,
                             "reason": ng_meta.get("reason", "금지어로 설정된 단어 '{word}'가 발견되었습니다.").format(word=word),
                             "suggestion": suggestion,
-                            "rect": [inst.x0, inst.y0, inst.x1, inst.y1]
+                            "rect": [inst.x0, inst.y0, inst.x1, inst.y1],
+                            "ai_review_label": lang_prompts.get("ai_review_label", "AI 리뷰"),
+                            "suggestion_label": lang_prompts.get("suggestion_label", "제안")
                         })
         
         # Trigger RAG indexing in the background
@@ -567,7 +569,11 @@ def upload_pdf():
                             rects = page.search_for(quote)
                             if rects:
                                 ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
-                    results.append(ann)
+                        
+                        # Add localized labels for consistency
+                        ann["ai_review_label"] = lang_prompts.get("ai_review_label", "AI 리뷰")
+                        ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
+                        results.append(ann)
             except json.JSONDecodeError:
                 print("Failed to parse JSON from Gemini:", response_text)
                 # We still have results from Level 1 if that was run

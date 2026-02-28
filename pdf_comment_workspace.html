@@ -1027,8 +1027,8 @@
                                                             wrapper.appendChild(overlay);
                                                         });
 
-                                                        // Handle rect-based annotations (from AI)
-                                                        const rectAnns = annotations.filter(a => a.page === currentPageNum && a.type === 'rect');
+                                                        // Handle rect-based annotations (from AI and text search)
+                                                        const rectAnns = annotations.filter(a => a.page === currentPageNum && (a.type === 'rect' || a.rects));
                                                         if (rectAnns.length > 0 && currentPdfDoc) {
                                                             const page = await currentPdfDoc.getPage(currentPageNum);
                                                             const viewport = page.getViewport({ scale: 1.0 });
@@ -1037,22 +1037,27 @@
 
                                                             rectAnns.forEach(ann => {
                                                                 const colors = categoryColors[ann.category] || categoryColors['일반'];
-                                                                const [x0, y0, x1, y1] = ann.rect;
 
-                                                                const overlay = document.createElement('div');
-                                                                overlay.className = `annotation-overlay ann-view-${ann.id} absolute border-2 ${colors.border} ${colors.bg} cursor-pointer group z-30`;
+                                                                // Use rects array if available, otherwise fallback to single rect
+                                                                const targetCoords = ann.rects || (ann.rect ? [ann.rect] : []);
 
-                                                                overlay.style.left = (x0 / pageWidth * 100) + '%';
-                                                                overlay.style.top = (y0 / pageHeight * 100) + '%';
-                                                                overlay.style.width = ((x1 - x0) / pageWidth * 100) + '%';
-                                                                overlay.style.height = ((y1 - y0) / pageHeight * 100) + '%';
+                                                                targetCoords.forEach(coords => {
+                                                                    const [x0, y0, x1, y1] = coords;
+                                                                    const overlay = document.createElement('div');
+                                                                    overlay.className = `annotation-overlay ann-view-${ann.id} absolute border-2 ${colors.border} ${colors.bg} cursor-pointer group z-30`;
 
-                                                                const bubble = document.createElement('div');
-                                                                bubble.className = `absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-white dark:bg-slate-800 border ${colors.border} rounded shadow-lg text-xs w-48 hidden group-hover:block z-50 text-slate-800 dark:text-slate-100 cursor-default`;
-                                                                bubble.innerHTML = `<div class="font-bold border-b border-slate-200 dark:border-slate-700 pb-1 mb-1 ${colors.text}">${ann.category}</div><div class="whitespace-pre-wrap">${escapeHtml(ann.comment)}</div>`;
+                                                                    overlay.style.left = (x0 / pageWidth * 100) + '%';
+                                                                    overlay.style.top = (y0 / pageHeight * 100) + '%';
+                                                                    overlay.style.width = ((x1 - x0) / pageWidth * 100) + '%';
+                                                                    overlay.style.height = ((y1 - y0) / pageHeight * 100) + '%';
 
-                                                                overlay.appendChild(bubble);
-                                                                wrapper.appendChild(overlay);
+                                                                    const bubble = document.createElement('div');
+                                                                    bubble.className = `absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-white dark:bg-slate-800 border ${colors.border} rounded shadow-lg text-xs w-48 hidden group-hover:block z-50 text-slate-800 dark:text-slate-100 cursor-default`;
+                                                                    bubble.innerHTML = `<div class="font-bold border-b border-slate-200 dark:border-slate-700 pb-1 mb-1 ${colors.text}">${ann.category}</div><div class="whitespace-pre-wrap">${escapeHtml(ann.comment)}</div>`;
+
+                                                                    overlay.appendChild(bubble);
+                                                                    wrapper.appendChild(overlay);
+                                                                });
                                                             });
                                                         }
 
@@ -1596,20 +1601,23 @@
                                                                     w: (ann.rect.w || 0) * width,
                                                                     h: (ann.rect.h || 0) * height
                                                                 });
-                                                            } else if ((ann.type === 'rect' || ann.type === 'text' || ann.type === 'critical' || ann.type === 'suggestion') && ann.rect) {
-                                                                try {
-                                                                    const [x0, y0, x1, y1] = Array.isArray(ann.rect) ? ann.rect : [];
-                                                                    if (x0 !== undefined) {
-                                                                        targetRects.push({
-                                                                            x: x0,
-                                                                            y: height - y1,
-                                                                            w: x1 - x0,
-                                                                            h: y1 - y0
-                                                                        });
+                                                            } else if (ann.rects || ann.rect) {
+                                                                const sourceCoords = ann.rects || [ann.rect];
+                                                                sourceCoords.forEach(coords => {
+                                                                    try {
+                                                                        const [x0, y0, x1, y1] = Array.isArray(coords) ? coords : [];
+                                                                        if (x0 !== undefined) {
+                                                                            targetRects.push({
+                                                                                x: x0,
+                                                                                y: height - y1,
+                                                                                w: x1 - x0,
+                                                                                h: y1 - y0
+                                                                            });
+                                                                        }
+                                                                    } catch (e) {
+                                                                        console.warn('Malformed rect data:', coords, e);
                                                                     }
-                                                                } catch (e) {
-                                                                    console.warn('Malformed rect data:', ann.rect, e);
-                                                                }
+                                                                });
                                                             }
 
                                                             if (targetRects.length === 0) continue;
@@ -1620,7 +1628,7 @@
                                                                 const bounds = [rect.x, rect.y, rect.x + rect.w, rect.y + rect.h];
 
                                                                 let annotDict;
-                                                                if (ann.type === 'text' || ann.type === 'critical' || ann.type === 'suggestion' || category.includes('리뷰') || category.includes('Review') || category.includes('レビュー')) {
+                                                                if (ann.type !== 'area') {
                                                                     annotDict = pdfDoc.context.obj({
                                                                         Type: 'Annot',
                                                                         Subtype: 'Highlight',
@@ -1975,41 +1983,78 @@
                                                         throw new Error(errorData.error || `Server error: ${response.status}`);
                                                     }
 
-                                                    const aiAnnotations = await response.json();
-                                                    console.log('Received annotations:', aiAnnotations.length);
+                                                    const initialData = await response.json();
+                                                    const jobId = initialData.job_id;
+                                                    if (!jobId) throw new Error("No job_id received from server.");
 
-                                                    if (Array.isArray(aiAnnotations)) {
-                                                        aiAnnotations.forEach(aiAnn => {
-                                                            const categoryMap = { 'critical': t.catUrgent, 'suggestion': t.catGeneral };
-                                                            const defaultCat = categoryMap[aiAnn.type?.toLowerCase()] || t.catGeneral;
+                                                    const pollStatus = async () => {
+                                                        try {
+                                                            const statusRes = await fetch(`http://localhost:5000/api/analysis-status/${jobId}`);
+                                                            if (!statusRes.ok) throw new Error("Status check failed");
+                                                            const jobData = await statusRes.json();
 
-                                                            const aiReviewLabel = aiAnn.ai_review_label || t.aiReviewLabel;
-                                                            const suggestionLabel = aiAnn.suggestion_label || t.suggestionLabel;
+                                                            if (jobData.status === 'completed') {
+                                                                processAnalysisResults(jobData.results);
+                                                                return true; // Done
+                                                            } else if (jobData.status === 'failed') {
+                                                                throw new Error(jobData.error || "Analysis failed on server.");
+                                                            }
+                                                            return false; // Still pending
+                                                        } catch (err) {
+                                                            console.error("Polling error:", err);
+                                                            alert("분석 상태 확인 중 오류가 발생했습니다: " + err.message);
+                                                            stopUI();
+                                                            return true; // Stop
+                                                        }
+                                                    };
 
-                                                            const newAnn = {
-                                                                id: Math.random().toString(36).substr(2, 9),
-                                                                page: aiAnn.page || 1,
-                                                                type: aiAnn.rect ? 'rect' : (aiAnn.quote ? 'text' : 'area'),
-                                                                keyword: aiAnn.quote,
-                                                                rect: aiAnn.rect || (aiAnn.quote ? undefined : { x: 0.1, y: 0.05, w: 0.8, h: 0.05 }),
-                                                                category: aiAnn.category || defaultCat,
-                                                                comment: `[${aiAnn.clause || aiReviewLabel}]\n${aiAnn.reason || aiAnn.comment || '상세 내용 없음'}\n\n[${suggestionLabel}]\n${aiAnn.suggestion || ''}`,
-                                                                referenced_text: aiAnn.referenced_text,
-                                                                isExisting: false
-                                                            };
-                                                            annotations.push(newAnn);
-                                                        });
-                                                        renderAnnotationList();
-                                                        updatePageDisplay();
-                                                        alert(t.aiCompleted);
-                                                    } else {
-                                                        alert(t.parsingError);
+                                                    const processAnalysisResults = (results) => {
+                                                        if (Array.isArray(results)) {
+                                                            results.forEach(aiAnn => {
+                                                                const categoryMap = { 'critical': t.catUrgent, 'suggestion': t.catGeneral };
+                                                                const defaultCat = categoryMap[aiAnn.type?.toLowerCase()] || t.catGeneral;
+                                                                const aiReviewLabel = aiAnn.ai_review_label || t.aiReviewLabel;
+                                                                const suggestionLabel = aiAnn.suggestion_label || t.suggestionLabel;
+
+                                                                const newAnn = {
+                                                                    id: Math.random().toString(36).substr(2, 9),
+                                                                    page: aiAnn.page || 1,
+                                                                    type: (aiAnn.rects || aiAnn.rect) ? 'rect' : (aiAnn.quote ? 'text' : 'area'),
+                                                                    keyword: aiAnn.quote,
+                                                                    rect: aiAnn.rect,
+                                                                    rects: aiAnn.rects,
+                                                                    category: aiAnn.category || defaultCat,
+                                                                    comment: `[${aiAnn.clause || aiReviewLabel}]\n${aiAnn.reason || aiAnn.comment || '상세 내용 없음'}\n\n[${suggestionLabel}]\n${aiAnn.suggestion || ''}`,
+                                                                    referenced_text: aiAnn.referenced_text,
+                                                                    isExisting: false
+                                                                };
+                                                                annotations.push(newAnn);
+                                                            });
+                                                            renderAnnotationList();
+                                                            updatePageDisplay();
+                                                            alert(t.aiCompleted);
+                                                        } else {
+                                                            alert(t.parsingError);
+                                                        }
+                                                        stopUI();
+                                                    };
+
+                                                    const stopUI = () => {
+                                                        btn.innerHTML = originalText;
+                                                        btn.disabled = false;
+                                                        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+                                                        if (ragStatus) ragStatus.classList.add('hidden');
                                                     }
+
+                                                    // Use interval for polling
+                                                    const intervalId = setInterval(async () => {
+                                                        const isDone = await pollStatus();
+                                                        if (isDone) clearInterval(intervalId);
+                                                    }, 3000);
 
                                                 } catch (err) {
                                                     console.error('AI Request Error:', err);
-                                                    alert(`AI 분석 요청 중 오류가 발생했습니다.\n\n상세 정보: ${err.message}\n\n백엔드 서버(backend.py)가 실행 중인지 확인해주세요.`);
-                                                } finally {
+                                                    alert(`AI 분석 요청 중 오류가 발생했습니다.\n\n상세 정보: ${err.message}`);
                                                     btn.innerHTML = originalText;
                                                     btn.disabled = false;
                                                     btn.classList.remove('opacity-70', 'cursor-not-allowed');

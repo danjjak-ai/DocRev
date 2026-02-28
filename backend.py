@@ -13,6 +13,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import unicodedata
 import re
+import uuid
 from langchain_community.retrievers import BM25Retriever
 
 app = Flask(__name__)
@@ -39,6 +40,167 @@ model = genai.GenerativeModel('gemini-2.5-flash')
 NG_WORDS = []
 # Global variable for Prompts
 PROMPTS = {}
+
+# --- Async Job Infrastructure ---
+analysis_jobs = {}
+analysis_lock = threading.Lock()
+
+def update_job_status(job_id, status, results=None, error=None):
+    with analysis_lock:
+        if job_id not in analysis_jobs:
+            analysis_jobs[job_id] = {"id": job_id, "status": "pending", "results": [], "error": None}
+        analysis_jobs[job_id]["status"] = status
+        if results is not None:
+            analysis_jobs[job_id]["results"] = results
+        if error:
+            analysis_jobs[job_id]["error"] = error
+
+@app.route('/api/analysis-status/<job_id>', methods=['GET'])
+def get_analysis_status(job_id):
+    with analysis_lock:
+        job = analysis_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+def perform_analysis_logic(doc, mode, lang):
+    """Core analysis logic separated to be runnable in background."""
+    lang_prompts = PROMPTS.get(lang, PROMPTS.get('ko', {}))
+    results = []
+    
+    # Extract text for RAG and LLM
+    all_text = ""
+    pages_text_list = []
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text = page.get_text()
+        all_text += f"--- Page {page_num + 1} ---\n{text}\n\n"
+        pages_text_list.append((page_num + 1, text))
+
+    # Trigger indexing in background (as it was)
+    doc_id = str(uuid.uuid4())
+    threading.Thread(target=index_pdf_text, args=(doc_id, pages_text_list), daemon=True).start()
+
+    # --- Level 1: Keyword Analysis ---
+    if mode in ['level1', 'both']:
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            ng_meta = lang_prompts.get('ng_violation', PROMPTS.get('ko', {}).get('ng_violation', {}))
+            for ng_item in NG_WORDS:
+                word = ng_item.get("word")
+                rule = ng_item.get("rule", "")
+                suggestion = ng_item.get("suggestion", "")
+                if not word: continue
+                
+                text_instances = page.search_for(word)
+                for inst in text_instances:
+                    results.append({
+                        "page": page_num + 1,
+                        "quote": word,
+                        "category": ng_meta.get("category", "금지어"),
+                        "type": "critical",
+                        "clause": rule,
+                        "reason": ng_meta.get("reason", "금지어가 발견되었습니다.").format(word=word),
+                        "suggestion": suggestion,
+                        "rect": [inst.x0, inst.y0, inst.x1, inst.y1],
+                        "rects": [[inst.x0, inst.y0, inst.x1, inst.y1]],
+                        "ai_review_label": lang_prompts.get("ai_review_label", "AI 리뷰"),
+                        "suggestion_label": lang_prompts.get("suggestion_label", "제안")
+                    })
+
+    # --- Level 2: AI Review (Gemini + RAG) ---
+    if mode in ['level2', 'both'] and api_key:
+        try:
+            # 1. 문서에서 관련 컨텍스트 검색 (Query Expansion 적용)
+            base_query = "판매정보제공 가이드라인 허위 과장 비방 금지"
+            expanded_query = expand_query_with_gemini(base_query, lang=lang)
+            relevant_docs = retrieve_relevant_context(expanded_query, k=7)
+            retrieved_context = "\n\n".join([f"[Context]: {d.page_content}" for d in relevant_docs])
+
+            # 2. Gemini에게 문서 분석 요청
+            review_prompt_template = lang_prompts.get('review', "")
+            if not review_prompt_template:
+                review_prompt_template = PROMPTS.get('en', {}).get('review', "")
+            
+            if review_prompt_template:
+                prompt = f"""
+                {review_prompt_template}
+
+                [Retrieved Guideline Context]:
+                {retrieved_context}
+
+                Whole Document Text:
+                {all_text}
+                """
+                
+                response = model.generate_content(prompt)
+                ai_response_text = response.text.strip()
+                
+                # Strip markdown blocks if present
+                if ai_response_text.startswith("```json"):
+                    ai_response_text = ai_response_text.split("```json")[1].split("```")[0].strip()
+                elif ai_response_text.startswith("```"):
+                     ai_response_text = ai_response_text.split("```")[1].split("```")[0].strip()
+
+                parsed_results = json.loads(ai_response_text)
+                if isinstance(parsed_results, list):
+                    for ann in parsed_results:
+                        # Robust page parsing
+                        try:
+                            page_val = ann.get("page", 1)
+                            if isinstance(page_val, str):
+                                import re
+                                match = re.search(r'\d+', page_val)
+                                page_val = int(match.group()) if match else 1
+                            page_num_actual = int(page_val)
+                            ann["page"] = page_num_actual
+                        except:
+                            ann["page"] = 1
+
+                        page_idx = ann["page"] - 1
+                        quote = ann.get("quote", "").strip()
+                        
+                        if 0 <= page_idx < len(doc) and quote:
+                            page = doc.load_page(page_idx)
+                            rects = robust_search_for_quote(page, quote)
+                            if rects:
+                                ann["rects"] = [[r.x0, r.y0, r.x1, r.y1] for r in rects]
+                                ann["rect"] = ann["rects"][0]
+                        
+                        # Fallbacks...
+                        if quote and "rects" not in ann:
+                            for p_idx in range(len(doc)):
+                                pg = doc.load_page(p_idx)
+                                rects = robust_search_for_quote(pg, quote)
+                                if rects:
+                                    ann["rects"] = [[r.x0, r.y0, r.x1, r.y1] for r in rects]
+                                    ann["rect"] = ann["rects"][0]
+                                    ann["page"] = p_idx + 1
+                                    break
+                                    
+                        ann["ai_review_label"] = lang_prompts.get("ai_review_label", "AI 리뷰")
+                        ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
+                        if not ann.get("category"):
+                            ann["category"] = ann["ai_review_label"]
+                        results.append(ann)
+            else:
+                print(f"No review prompt template for lang {lang}")
+        except Exception as e:
+            print(f"AI Review Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    return results
+
+def background_analysis_task(job_id, pdf_bytes, mode, lang):
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        results = perform_analysis_logic(doc, mode, lang)
+        update_job_status(job_id, "completed", results=results)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        update_job_status(job_id, "failed", error=str(e))
 
 def load_ng_words():
     """
@@ -244,6 +406,78 @@ def tokenize_japanese_simple(text):
     """Simple tokenizer for Japanese BM25 (splitting by whitespace and non-alphanumeric)."""
     # Using a simple regex to match words/characters for BM25
     return re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text)
+
+def robust_search_for_quote(page, quote):
+    """
+    Finds text instances of a quote in a PyMuPDF page with robustness to whitespace/newline differences.
+    Returns a list of fitz.Rect objects that match parts of the quote.
+    """
+    if not quote or not quote.strip():
+        return []
+
+    # 1. Normalize the quote: Remove all whitespace/newlines and handle character normalization
+    # NFKC/NFC normalization is applied (especially needed for Japanese/Korean character forms)
+    norm_quote = unicodedata.normalize('NFKC', quote)
+    norm_quote = re.sub(r'\s+', '', norm_quote)
+
+    if not norm_quote:
+        return []
+
+    # 2. Extract words with their bounding boxes and line/block metadata
+    # page.get_text("words") returns: (x0, y0, x1, y1, "text", block_no, line_no, word_no)
+    words = page.get_text("words")
+    
+    # 3. Build a mapping of characters from words back to their BBoxes and line identifiers
+    char_map = [] # List of (normalized_char, rect, line_id)
+    
+    for word in words:
+        x0, y0, x1, y1, text, block_no, line_no, word_no = word
+        # Normalize each word
+        norm_word = unicodedata.normalize('NFKC', text)
+        
+        char_count = len(norm_word)
+        if char_count == 0: continue
+        
+        # Distribute word width approximately per character for visualization
+        char_width = (x1 - x0) / char_count
+        line_id = (block_no, line_no) # Composite key for line
+        
+        for i, char in enumerate(norm_word):
+            char_rect = fitz.Rect(x0 + i * char_width, y0, x0 + (i + 1) * char_width, y1)
+            char_map.append((char, char_rect, line_id))
+
+    # 4. Search for normalized quote in concatenated text
+    full_norm_text = "".join([c[0] for c in char_map])
+    match_index = full_norm_text.find(norm_quote)
+    
+    if match_index == -1:
+        return []
+
+    # 5. Aggregate rects for matching character range, merging rects on the same line
+    results = []
+    current_rect = None
+    last_line_id = None
+    
+    for i in range(match_index, match_index + len(norm_quote)):
+        char, char_rect, line_id = char_map[i]
+        
+        if current_rect is None:
+            current_rect = fitz.Rect(char_rect)
+            last_line_id = line_id
+        else:
+            # If same line (same block_no and line_no), union the rects
+            if line_id == last_line_id:
+                current_rect = current_rect | char_rect
+            else:
+                # Line change: push finished rect and start new one
+                results.append(current_rect)
+                current_rect = fitz.Rect(char_rect)
+                last_line_id = line_id
+                
+    if current_rect:
+        results.append(current_rect)
+
+    return results
 
 @app.route('/api/reference-docs', methods=['GET'])
 def list_reference_docs():
@@ -460,170 +694,22 @@ def upload_pdf():
     if not file.filename.lower().endswith('.pdf'):
         return jsonify({"error": "File must be a PDF"}), 400
 
-    try:
-        # Get analysis mode and language from request
-        mode = request.form.get('mode', 'both')
-        lang = request.form.get('lang', 'ko')
-        lang_prompts = PROMPTS.get(lang, PROMPTS.get('ko', {}))
-        print(f"--- Received /upload request ---")
-        print(f"Mode: {mode}")
-        
-        # Read the file content into memory
-        pdf_bytes = file.read()
-        print(f"File Size: {len(pdf_bytes)} bytes")
-        
-        # Open the PDF with PyMuPDF
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        
-        all_text = ""
-        pages_text_list = [] # For RAG indexing
-        results = [] # Final aggregated results
-        
-        # Extract text for all modes (needed for RAG and LLM)
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            text = page.get_text()
-            all_text += f"--- Page {page_num + 1} ---\n{text}\n\n"
-            pages_text_list.append((page_num + 1, text))
-
-        # --- Level 1: Keyword Analysis (Forbidden Words) ---
-        if mode in ['level1', 'both']:
-            for page_num in range(len(doc)):
-                page = doc.load_page(page_num)
-                # Search for NG_WORDS on this page
-                ng_meta = lang_prompts.get('ng_violation', PROMPTS.get('ko', {}).get('ng_violation', {}))
-                for ng_item in NG_WORDS:
-                    word = ng_item.get("word")
-                    rule = ng_item.get("rule", "내부 금지어 데이터베이스")
-                    suggestion = ng_item.get("suggestion", "해당 단어를 삭제하거나 적절한 대체어로 수정하세요.")
-                    
-                    if not word: continue
-                    
-                    text_instances = page.search_for(word)
-                    for inst in text_instances:
-                        # inst is a Rect object (x0, y0, x1, y1)
-                        results.append({
-                            "page": page_num + 1,
-                            "quote": word,
-                            "category": ng_meta.get("category", "금지어"),
-                            "type": "critical",
-                            "clause": rule,
-                            "reason": ng_meta.get("reason", "금지어로 설정된 단어 '{word}'가 발견되었습니다.").format(word=word),
-                            "suggestion": suggestion,
-                            "rect": [inst.x0, inst.y0, inst.x1, inst.y1],
-                            "ai_review_label": lang_prompts.get("ai_review_label", "AI 리뷰"),
-                            "suggestion_label": lang_prompts.get("suggestion_label", "제안")
-                        })
-        
-        # Trigger RAG indexing in the background
-        index_pdf_text(file.filename, pages_text_list)
-
-        # --- Level 2: RAG Analysis (Guidelines) ---
-        if mode in ['level2', 'both']:
-            # Retrieve relevant context using the Sales Guideline topics, with query expansion
-            base_query = "판매정보제공 가이드라인 허위 과장 비방 금지"
-            expanded_guideline_query = expand_query_with_gemini(base_query, lang=lang)
-            relevant_docs = retrieve_relevant_context(expanded_guideline_query, k=7)
-            retrieved_context = "\n\n".join([f"[Source Fragment]: {d.page_content}" for d in relevant_docs])
-
-            # Determine prompt
-            review_prompt_template = lang_prompts.get('review', "")
-            
-            if not review_prompt_template:
-                return jsonify({"error": f"No review prompt found for language: {lang}"}), 500
-
-            # Construct the final prompt
-            prompt = f"""
-            {review_prompt_template}
+    job_id = str(uuid.uuid4())
+    mode = request.form.get('mode', 'both')
+    lang = request.form.get('lang', 'ko')
     
-            [Retrieved Guideline Context]:
-            {retrieved_context}
+    # Store bytes in memory for the background thread
+    pdf_bytes = file.read()
     
-            Whole Document Text:
-            {all_text}
-            """
-    
-            # Call Gemini API
-            if not api_key:
-                return jsonify({"error": "Gemini API Key가 설정되지 않았습니다."}), 500
-    
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
-            
-            # Clean up JSON blocks
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0].strip()
-                
-            try:
-                ai_annotations = json.loads(response_text)
-                
-                # Level 2 결과에 대해서도 텍스트 검색을 통해 rect 정보 추가 시도
-                for ann in ai_annotations:
-                    # Robust page parsing
-                    try:
-                        page_val = ann.get("page", 1)
-                        if isinstance(page_val, str):
-                            import re
-                            match = re.search(r'\d+', page_val)
-                            page_val = int(match.group()) if match else 1
-                        page_num_actual = int(page_val)
-                        ann["page"] = page_num_actual
-                        page_idx = page_num_actual - 1
-                    except (ValueError, TypeError, AttributeError):
-                        page_idx = 0
-                        ann["page"] = 1
+    # Start background thread
+    update_job_status(job_id, "pending")
+    threading.Thread(
+        target=background_analysis_task, 
+        args=(job_id, pdf_bytes, mode, lang), 
+        daemon=True
+    ).start()
 
-                    quote = ann.get("quote", "").strip()
-                    # Try to find the quote on the suggested page first
-                    if 0 <= page_idx < len(doc):
-                        page = doc.load_page(page_idx)
-                        if quote:
-                            rects = page.search_for(quote)
-                            if rects:
-                                ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
-                    
-                    # Fallback 1: search all pages if not found on the suggested page
-                    if quote and "rect" not in ann:
-                        for p_idx in range(len(doc)):
-                            if p_idx == page_idx: continue
-                            pg = doc.load_page(p_idx)
-                            rects = pg.search_for(quote)
-                            if rects:
-                                ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
-                                ann["page"] = p_idx + 1
-                                break
-                    
-                    # Fallback 2: Robust search (prefix search) if still not found
-                    if quote and "rect" not in ann and len(quote) > 10:
-                        prefix = quote[:30] # Try first 30 chars
-                        for p_idx in range(len(doc)):
-                            pg = doc.load_page(p_idx)
-                            rects = pg.search_for(prefix)
-                            if rects:
-                                ann["rect"] = [rects[0].x0, rects[0].y0, rects[0].x1, rects[0].y1]
-                                ann["page"] = p_idx + 1
-                                break
-                    
-                    # Ensure consistent labels and category
-                    ann["ai_review_label"] = lang_prompts.get("ai_review_label", "AI 리뷰")
-                    ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
-                    if not ann.get("category"):
-                        ann["category"] = ann["ai_review_label"]
-                    
-                    results.append(ann)
-            except json.JSONDecodeError:
-                print("Failed to parse JSON from Gemini:", response_text)
-                # We still have results from Level 1 if that was run
-
-        doc.close()
-        return jsonify(results), 200
-
-    except Exception as e:
-        print(f"Error processing file: {e}")
-        if 'doc' in locals(): doc.close()
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"job_id": job_id, "status": "pending"})
 
 @app.route('/chat', methods=['POST'])
 def chat_with_document():

@@ -5,9 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAG 가이드 문서 관리 - DocRev</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="css/output.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="config.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -112,7 +113,7 @@
 
         async function loadDocs() {
             try {
-                const response = await fetch('http://localhost:5000/api/reference-docs');
+                const response = await fetch(API_BASE_URL + '/api/reference-docs');
                 const files = await response.json();
                 const list = document.getElementById('docList');
                 list.innerHTML = '';
@@ -176,7 +177,7 @@
             if (!confirm(`'${filename}' 파일을 삭제하시겠습니까?`)) return;
 
             try {
-                const response = await fetch(`http://localhost:5000/api/reference-docs/${encodeURIComponent(filename)}`, {
+                const response = await fetch(`${API_BASE_URL}/api/reference-docs/${encodeURIComponent(filename)}`, {
                     method: 'DELETE'
                 });
 
@@ -194,7 +195,7 @@
 
         async function startReconstruction() {
             try {
-                const response = await fetch('http://localhost:5000/api/rag/reconstruct', { method: 'POST' });
+                const response = await fetch(API_BASE_URL + '/api/rag/reconstruct', { method: 'POST' });
                 if (response.ok) {
                     setUIRunningState(true);
                     pollStatus();
@@ -212,7 +213,7 @@
 
             pollingInterval = setInterval(async () => {
                 try {
-                    const response = await fetch('http://localhost:5000/api/rag/status');
+                    const response = await fetch(API_BASE_URL + '/api/rag/status');
                     const status = await response.json();
 
                     if (!status.is_running && status.message) {
@@ -285,7 +286,7 @@
         }
 
         // Initialize state by checking if already running
-        fetch('http://localhost:5000/api/rag/status')
+        fetch(API_BASE_URL + '/api/rag/status')
             .then(res => res.json())
             .then(status => {
                 if (status.is_running) {

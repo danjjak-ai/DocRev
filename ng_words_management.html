@@ -4,40 +4,62 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>금지어 관리 - PDF Review Workspace</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <title>NG Word Management - PDF Review Workspace</title>
+    <link href="css/output.css" rel="stylesheet">
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Noto+Sans+KR:wght@300;400;500;700&amp;display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
         rel="stylesheet" />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        primary: "#3b82f6",
-                    },
-                    fontFamily: {
-                        sans: ["Inter", "Noto Sans KR", "sans-serif"],
-                    },
-                },
-            },
-        };
-    </script>
-    <style type="text/tailwindcss">
-        body { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    <script src="config.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .variant-container {
+            display: none !important;
+        }
+
+        #variant-en {
+            display: block !important;
+        }
+
+        body:has(#variant-kr:target) #variant-en,
+        body:has(#variant-jp:target) #variant-en {
+            display: none !important;
+        }
+
+        #variant-kr:target,
+        #variant-jp:target,
+        #variant-en:target {
+            display: block !important;
+        }
+
+        .lang-dropdown:hover .lang-menu {
+            display: block;
+        }
     </style>
 </head>
 
 <body
     class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200">
-    <div class="max-w-4xl mx-auto p-4 sm:p-8">
+
+    <!-- Korean Variant -->
+    <div class="variant-container max-w-4xl mx-auto p-4 sm:p-8" id="variant-kr">
         <header class="flex items-center justify-between mb-8">
             <div class="flex items-center gap-3">
                 <div class="bg-primary p-2 rounded-lg text-white">
@@ -47,8 +69,25 @@
                     <h1 class="text-xl font-bold tracking-tight">금지어 관리</h1>
                     <p class="text-xs text-slate-500">문서 분석 시 필터링할 금지어를 관리하세요</p>
                 </div>
+                <div class="relative lang-dropdown ml-4">
+                    <button
+                        class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
+                        <span class="material-symbols-outlined !text-[14px]">language</span>
+                        KR
+                        <span class="material-symbols-outlined !text-[12px]">expand_more</span>
+                    </button>
+                    <div
+                        class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
+                            href="#variant-en">English (EN)</a>
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
+                            href="#variant-kr">한국어 (KR)</a>
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                            href="#variant-jp">日本語 (JP)</a>
+                    </div>
+                </div>
             </div>
-            <a href="pdf_comment_workspace.html"
+            <a href="pdf_comment_workspace.html#variant-kr"
                 class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
                 <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
                 워크스페이스로 돌아가기
@@ -56,7 +95,6 @@
         </header>
 
         <main class="space-y-6">
-            <!-- Add New Word Section -->
             <section
                 class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
                 <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -67,23 +105,26 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="space-y-1">
                             <label class="text-[11px] font-bold text-slate-400 uppercase">금지어</label>
-                            <input id="new-word-input" type="text" placeholder="예: 최고, No.1"
-                                class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <input
+                                class="new-word-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                type="text" placeholder="예: 최고, No.1">
                         </div>
                         <div class="space-y-1">
                             <label class="text-[11px] font-bold text-slate-400 uppercase">가이드라인 조항</label>
-                            <input id="new-rule-input" type="text" placeholder="예: 가이드라인 제1의 3-(2)-①"
-                                class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <input
+                                class="new-rule-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                type="text" placeholder="예: 가이드라인 제1의 3-(2)-①">
                         </div>
                     </div>
                     <div class="space-y-1">
                         <label class="text-[11px] font-bold text-slate-400 uppercase">수정 제안 (가이드라인 위반 이유 추천 문구)</label>
-                        <textarea id="new-suggestion-input" rows="2" placeholder="사용자에게 표시될 수정 권고 문구를 입력하세요..."
-                            class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"></textarea>
+                        <textarea
+                            class="new-suggestion-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                            rows="2" placeholder="사용자에게 표시될 수정 권고 문구를 입력하세요..."></textarea>
                     </div>
                     <div class="flex justify-end">
-                        <button id="add-word-btn"
-                            class="bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
+                        <button
+                            class="add-word-btn bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
                             <span class="material-symbols-outlined !text-[18px]">add</span>
                             추가하기
                         </button>
@@ -91,7 +132,6 @@
                 </div>
             </section>
 
-            <!-- Words List Section -->
             <section
                 class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
                 <div
@@ -100,32 +140,237 @@
                         <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
                         현재 금지어 목록
                     </h2>
-                    <span id="word-count"
-                        class="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0개</span>
+                    <span
+                        class="word-count text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0개</span>
                 </div>
-                <!-- Table Header -->
-                <div class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
+                <div
+                    class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
                     <div class="col-span-3">금지어</div>
                     <div class="col-span-3">가이드라인 조항</div>
                     <div class="col-span-5">수정 제안</div>
                     <div class="col-span-1 text-right">작업</div>
                 </div>
-                <div id="words-list"
-                    class="divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
-                    <!-- Dynamic Items -->
+                <div
+                    class="words-list divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
                 </div>
-                <!-- Empty State -->
-                <div id="empty-state" class="hidden py-12 text-center">
+                <div class="empty-state hidden py-12 text-center">
                     <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
                     <p class="text-sm text-slate-500">등록된 금지어가 없습니다.</p>
                 </div>
             </section>
         </main>
-
-        <footer class="mt-8 text-center">
-            <p class="text-[10px] text-slate-400">© 2024 PDF Annotation Workspace • Config Management Module</p>
-        </footer>
     </div>
+
+    <!-- Japanese Variant -->
+    <div class="variant-container max-w-4xl mx-auto p-4 sm:p-8" id="variant-jp">
+        <header class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-primary p-2 rounded-lg text-white">
+                    <span class="material-symbols-outlined">block</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">禁止用語管理</h1>
+                    <p class="text-xs text-slate-500">文書分析時にフィルタリングする禁止用語を管理してください</p>
+                </div>
+                <div class="relative lang-dropdown ml-4">
+                    <button
+                        class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
+                        <span class="material-symbols-outlined !text-[14px]">language</span>
+                        JP
+                        <span class="material-symbols-outlined !text-[12px]">expand_more</span>
+                    </button>
+                    <div
+                        class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
+                            href="#variant-en">English (EN)</a>
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
+                            href="#variant-kr">한국어 (KR)</a>
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                            href="#variant-jp">日本語 (JP)</a>
+                    </div>
+                </div>
+            </div>
+            <a href="pdf_comment_workspace.html#variant-jp"
+                class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
+                ワークスペースに戻る
+            </a>
+        </header>
+
+        <main class="space-y-6">
+            <section
+                class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary !text-[18px]">add_circle</span>
+                    新規禁止用語追加
+                </h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase">禁止用語</label>
+                            <input
+                                class="new-word-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                type="text" placeholder="例: 最高, No.1">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase">ガイドライン条項</label>
+                            <input
+                                class="new-rule-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                type="text" placeholder="例: ガイドライン第1の3-(2)-①">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase">修正案 (ガイドライン違反理由の推奨文言)</label>
+                        <textarea
+                            class="new-suggestion-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                            rows="2" placeholder="ユーザーに表示される修正勧告文言を入力してください..."></textarea>
+                    </div>
+                    <div class="flex justify-end">
+                        <button
+                            class="add-word-btn bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined !text-[18px]">add</span>
+                            追加する
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <h2 class="text-sm font-semibold flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
+                        現在の禁止用語リスト
+                    </h2>
+                    <span
+                        class="word-count text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0個</span>
+                </div>
+                <div
+                    class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
+                    <div class="col-span-3">禁止用語</div>
+                    <div class="col-span-3">ガイドライン条項</div>
+                    <div class="col-span-5">修正案</div>
+                    <div class="col-span-1 text-right">操作</div>
+                </div>
+                <div
+                    class="words-list divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
+                </div>
+                <div class="empty-state hidden py-12 text-center">
+                    <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
+                    <p class="text-sm text-slate-500">登録された禁止用語はありません。</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- English Variant -->
+    <div class="variant-container max-w-4xl mx-auto p-4 sm:p-8" id="variant-en">
+        <header class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-primary p-2 rounded-lg text-white">
+                    <span class="material-symbols-outlined">block</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">NG Word Management</h1>
+                    <p class="text-xs text-slate-500">Manage forbidden words to be filtered during document analysis</p>
+                </div>
+                <div class="relative lang-dropdown ml-4">
+                    <button
+                        class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
+                        <span class="material-symbols-outlined !text-[14px]">language</span>
+                        EN
+                        <span class="material-symbols-outlined !text-[12px]">expand_more</span>
+                    </button>
+                    <div
+                        class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
+                            href="#variant-en">English (EN)</a>
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
+                            href="#variant-kr">한국어 (KR)</a>
+                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
+                            href="#variant-jp">日本語 (JP)</a>
+                    </div>
+                </div>
+            </div>
+            <a href="pdf_comment_workspace.html#variant-en"
+                class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
+                Back to Workspace
+            </a>
+        </header>
+
+        <main class="space-y-6">
+            <section
+                class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary !text-[18px]">add_circle</span>
+                    Add New NG Word
+                </h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase">NG Word</label>
+                            <input
+                                class="new-word-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                type="text" placeholder="e.g. Best, No.1">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase">Guideline Clause</label>
+                            <input
+                                class="new-rule-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                type="text" placeholder="e.g. Guideline Clause 1-3-(2)-1">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase">Suggestion (Reason for
+                            Violation)</label>
+                        <textarea
+                            class="new-suggestion-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                            rows="2" placeholder="Enter the suggestion text to be displayed to users..."></textarea>
+                    </div>
+                    <div class="flex justify-end">
+                        <button
+                            class="add-word-btn bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined !text-[18px]">add</span>
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <h2 class="text-sm font-semibold flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
+                        Current NG Word List
+                    </h2>
+                    <span
+                        class="word-count text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0</span>
+                </div>
+                <div
+                    class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
+                    <div class="col-span-3">NG Word</div>
+                    <div class="col-span-3">Clause</div>
+                    <div class="col-span-5">Suggestion</div>
+                    <div class="col-span-1 text-right">Actions</div>
+                </div>
+                <div
+                    class="words-list divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
+                </div>
+                <div class="empty-state hidden py-12 text-center">
+                    <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
+                    <p class="text-sm text-slate-500">No NG words registered.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="mt-8 text-center pb-8">
+        <p class="text-[10px] text-slate-400">© 2024 PDF Annotation Workspace • Config Management Module</p>
+    </footer>
 
     <!-- Edit Modal -->
     <div id="edit-modal"
@@ -133,63 +378,107 @@
         <div
             class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <h3 class="font-bold text-lg">금지어 수정</h3>
+                <h3 class="font-bold text-lg modal-title">금지어 수정</h3>
                 <button id="close-modal" class="text-slate-400 hover:text-slate-600"><span
                         class="material-symbols-outlined">close</span></button>
             </div>
             <div class="p-6 space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase">기존 단어</label>
+                        <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-old">기존 단어</label>
                         <p id="old-word-display"
                             class="bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 text-sm opacity-60">
                         </p>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase">새 단어</label>
+                        <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-new">새 단어</label>
                         <input id="edit-word-input" type="text"
                             class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary">
                     </div>
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[11px] font-bold text-slate-400 uppercase">가이드라인 조항</label>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-rule">가이드라인 조항</label>
                     <input id="edit-rule-input" type="text"
                         class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary">
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[11px] font-bold text-slate-400 uppercase">수정 제안</label>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-suggestion">수정 제안</label>
                     <textarea id="edit-suggestion-input" rows="3"
                         class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary"></textarea>
                 </div>
             </div>
             <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
                 <button id="cancel-edit"
-                    class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">취소</button>
+                    class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors modal-btn-cancel">취소</button>
                 <button id="save-edit"
-                    class="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-600 rounded-lg transition-colors">저장하기</button>
+                    class="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-600 rounded-lg transition-colors modal-btn-save">저장하기</button>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = "http://localhost:5000/api/ng-words";
-        const wordsList = document.getElementById('words-list');
-        const emptyState = document.getElementById('empty-state');
-        const wordCount = document.getElementById('word-count');
-        
-        const newWordInput = document.getElementById('new-word-input');
-        const newRuleInput = document.getElementById('new-rule-input');
-        const newSuggestionInput = document.getElementById('new-suggestion-input');
-        const addWordBtn = document.getElementById('add-word-btn');
+        const API_BASE = API_BASE_URL + "/api/ng-words";
 
-        const editModal = document.getElementById('edit-modal');
-        const editWordInput = document.getElementById('edit-word-input');
-        const editRuleInput = document.getElementById('edit-rule-input');
-        const editSuggestionInput = document.getElementById('edit-suggestion-input');
-        const oldWordDisplay = document.getElementById('old-word-display');
-        
         let currentlyEditing = null;
         let allWords = [];
+
+        const translations = {
+            ko: {
+                editTitle: '금지어 수정',
+                labelOld: '기존 단어',
+                labelNew: '새 단어',
+                labelRule: '가이드라인 조항',
+                labelSuggestion: '수정 제안',
+                btnCancel: '취소',
+                btnSave: '저장하기',
+                confirmDelete: "'{word}'을(를) 정말 삭제하시겠습니까?",
+                errorFetch: '목록을 불러오지 못했습니다.',
+                errorAdd: '추가 실패',
+                errorDelete: '삭제 실패',
+                errorEdit: '수정 실패',
+                inputRequired: '금지어를 입력하세요.',
+                countSuffix: '개'
+            },
+            ja: {
+                editTitle: '禁止用語修正',
+                labelOld: '既存の単語',
+                labelNew: '新しい単語',
+                labelRule: 'ガイドライン条項',
+                labelSuggestion: '修正案',
+                btnCancel: 'キャンセル',
+                btnSave: '保存する',
+                confirmDelete: "'{word}'を本当に削除しますか？",
+                errorFetch: 'リストを読み込めませんでした。',
+                errorAdd: '追加失敗',
+                errorDelete: '削除失敗',
+                errorEdit: '修正失敗',
+                inputRequired: '禁止用語を入力してください。',
+                countSuffix: '個'
+            },
+            en: {
+                editTitle: 'Edit NG Word',
+                labelOld: 'Existing Word',
+                labelNew: 'New Word',
+                labelRule: 'Guideline Clause',
+                labelSuggestion: 'Suggestion',
+                btnCancel: 'Cancel',
+                btnSave: 'Save',
+                confirmDelete: "Are you sure you want to delete '{word}'?",
+                errorFetch: 'Failed to fetch the list.',
+                errorAdd: 'Failed to add.',
+                errorDelete: 'Failed to delete.',
+                errorEdit: 'Failed to edit.',
+                inputRequired: 'Please enter an NG word.',
+                countSuffix: ''
+            }
+        };
+
+        const getCurrentLang = () => {
+            const hash = window.location.hash || '#variant-en';
+            if (hash === '#variant-kr') return 'ko';
+            if (hash === '#variant-jp') return 'ja';
+            return 'en';
+        };
 
         async function fetchWords() {
             try {
@@ -198,50 +487,64 @@
                 renderWords(allWords);
             } catch (err) {
                 console.error("Fetch error:", err);
-                alert("목록을 불러오지 못했습니다.");
+                const t = translations[getCurrentLang()];
+                alert(t.errorFetch);
             }
         }
 
         function renderWords(words) {
-            wordsList.innerHTML = '';
-            wordCount.textContent = `${words.length}개`;
+            const lang = getCurrentLang();
+            const t = translations[lang];
 
-            if (words.length === 0) {
-                emptyState.classList.remove('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-                words.forEach(item => {
-                    const word = item.word || item; // Fallback for old string format
-                    const rule = item.rule || "-";
-                    const suggestion = item.suggestion || "-";
-                    
-                    const div = document.createElement('div');
-                    div.className = "grid grid-cols-12 gap-4 items-center px-6 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors";
-                    div.innerHTML = `
-                        <div class="col-span-3 text-sm font-semibold text-primary">${word}</div>
-                        <div class="col-span-3 text-xs text-slate-500 truncate" title="${rule}">${rule}</div>
-                        <div class="col-span-5 text-xs text-slate-600 line-clamp-2" title="${suggestion}">${suggestion}</div>
-                        <div class="col-span-1 flex items-center justify-end gap-1">
-                            <button onclick="openEditModal('${word}')" class="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-all">
-                                <span class="material-symbols-outlined !text-[18px]">edit</span>
-                            </button>
-                            <button onclick="deleteWord('${word}')" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">
-                                <span class="material-symbols-outlined !text-[18px]">delete</span>
-                            </button>
-                        </div>
-                    `;
-                    wordsList.appendChild(div);
-                });
-            }
+            // Sync all variants
+            document.querySelectorAll('.variant-container').forEach(container => {
+                const wordsList = container.querySelector('.words-list');
+                const emptyState = container.querySelector('.empty-state');
+                const wordCount = container.querySelector('.word-count');
+
+                wordsList.innerHTML = '';
+                wordCount.textContent = `${words.length}${t.countSuffix}`;
+
+                if (words.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    words.forEach(item => {
+                        const word = item.word || item;
+                        const rule = item.rule || "-";
+                        const suggestion = item.suggestion || "-";
+
+                        const div = document.createElement('div');
+                        div.className = "grid grid-cols-12 gap-4 items-center px-6 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors";
+                        div.innerHTML = `
+                            <div class="col-span-3 text-sm font-semibold text-primary">${word}</div>
+                            <div class="col-span-3 text-xs text-slate-500 truncate" title="${rule}">${rule}</div>
+                            <div class="col-span-5 text-xs text-slate-600 line-clamp-2" title="${suggestion}">${suggestion}</div>
+                            <div class="col-span-1 flex items-center justify-end gap-1">
+                                <button onclick="openEditModal('${word}')" class="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-all">
+                                    <span class="material-symbols-outlined !text-[18px]">edit</span>
+                                </button>
+                                <button onclick="deleteWord('${word}')" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">
+                                    <span class="material-symbols-outlined !text-[18px]">delete</span>
+                                </button>
+                            </div>
+                        `;
+                        wordsList.appendChild(div);
+                    });
+                }
+            });
         }
 
-        async function addWord() {
-            const word = newWordInput.value.trim();
-            const rule = newRuleInput.value.trim();
-            const suggestion = newSuggestionInput.value.trim();
-            
+        async function addWord(variantId) {
+            const container = document.getElementById(variantId);
+            const word = container.querySelector('.new-word-input').value.trim();
+            const rule = container.querySelector('.new-rule-input').value.trim();
+            const suggestion = container.querySelector('.new-suggestion-input').value.trim();
+
+            const t = translations[getCurrentLang()];
+
             if (!word) {
-                alert("금지어를 입력하세요.");
+                alert(t.inputRequired);
                 return;
             }
 
@@ -253,13 +556,14 @@
                 });
 
                 if (response.ok) {
-                    newWordInput.value = '';
-                    newRuleInput.value = '';
-                    newSuggestionInput.value = '';
+                    // Clear inputs in ALL variants
+                    document.querySelectorAll('.new-word-input').forEach(i => i.value = '');
+                    document.querySelectorAll('.new-rule-input').forEach(i => i.value = '');
+                    document.querySelectorAll('.new-suggestion-input').forEach(i => i.value = '');
                     fetchWords();
                 } else {
                     const err = await response.json();
-                    alert(err.error || "추가 실패");
+                    alert(err.error || t.errorAdd);
                 }
             } catch (err) {
                 console.error("Add error:", err);
@@ -267,7 +571,8 @@
         }
 
         async function deleteWord(word) {
-            if (!confirm(`'${word}'을(를) 정말 삭제하시겠습니까?`)) return;
+            const t = translations[getCurrentLang()];
+            if (!confirm(t.confirmDelete.replace('{word}', word))) return;
 
             try {
                 const response = await fetch(API_BASE, {
@@ -279,7 +584,7 @@
                 if (response.ok) {
                     fetchWords();
                 } else {
-                    alert("삭제 실패");
+                    alert(t.errorDelete);
                 }
             } catch (err) {
                 console.error("Delete error:", err);
@@ -291,22 +596,43 @@
             if (!item) return;
 
             currentlyEditing = word;
-            oldWordDisplay.textContent = word;
-            editWordInput.value = word;
-            editRuleInput.value = item.rule || "";
-            editSuggestionInput.value = item.suggestion || "";
-            
-            editModal.classList.remove('hidden');
-            editWordInput.focus();
+            document.getElementById('old-word-display').textContent = word;
+            document.getElementById('edit-word-input').value = word;
+            document.getElementById('edit-rule-input').value = item.rule || "";
+            document.getElementById('edit-suggestion-input').value = item.suggestion || "";
+
+            // Localize modal
+            const t = translations[getCurrentLang()];
+            document.querySelector('.modal-title').textContent = t.editTitle;
+            document.querySelector('.modal-label-old').textContent = t.labelOld;
+            document.querySelector('.modal-label-new').textContent = t.labelNew;
+            document.querySelector('.modal-label-rule').textContent = t.labelRule;
+            document.querySelector('.modal-label-suggestion').textContent = t.labelSuggestion;
+            document.querySelector('.modal-btn-cancel').textContent = t.btnCancel;
+            document.querySelector('.modal-btn-save').textContent = t.btnSave;
+
+            document.getElementById('edit-modal').classList.remove('hidden');
+            document.getElementById('edit-word-input').focus();
         }
 
+        // Global Event Delegation for Add Buttons
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.add-word-btn');
+            if (btn) {
+                const variantContainer = btn.closest('.variant-container');
+                if (variantContainer) addWord(variantContainer.id);
+            }
+        });
+
         document.getElementById('save-edit').addEventListener('click', async () => {
-            const newWord = editWordInput.value.trim();
-            const newRule = editRuleInput.value.trim();
-            const newSuggestion = editSuggestionInput.value.trim();
-            
+            const newWord = document.getElementById('edit-word-input').value.trim();
+            const newRule = document.getElementById('edit-rule-input').value.trim();
+            const newSuggestion = document.getElementById('edit-suggestion-input').value.trim();
+
+            const t = translations[getCurrentLang()];
+
             if (!newWord) {
-                alert("금지어를 입력하세요.");
+                alert(t.inputRequired);
                 return;
             }
 
@@ -314,8 +640,8 @@
                 const response = await fetch(API_BASE, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        old_word: currentlyEditing, 
+                    body: JSON.stringify({
+                        old_word: currentlyEditing,
                         new_word: newWord,
                         rule: newRule,
                         suggestion: newSuggestion
@@ -323,25 +649,27 @@
                 });
 
                 if (response.ok) {
-                    editModal.classList.add('hidden');
+                    document.getElementById('edit-modal').classList.add('hidden');
                     fetchWords();
                 } else {
                     const err = await response.json();
-                    alert(err.error || "수정 실패");
+                    alert(err.error || t.errorEdit);
                 }
             } catch (err) {
                 console.error("Edit error:", err);
             }
         });
 
-        document.getElementById('close-modal').onclick = () => editModal.classList.add('hidden');
-        document.getElementById('cancel-edit').onclick = () => editModal.classList.add('hidden');
-        addWordBtn.onclick = addWord;
+        document.getElementById('close-modal').onclick = () => document.getElementById('edit-modal').classList.add('hidden');
+        document.getElementById('cancel-edit').onclick = () => document.getElementById('edit-modal').classList.add('hidden');
+
+        window.addEventListener('hashchange', () => {
+            renderWords(allWords);
+        });
 
         // Initial Load
         fetchWords();
     </script>
-</body>
 </body>
 
 </html>

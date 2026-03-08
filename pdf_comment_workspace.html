@@ -5,75 +5,70 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>PDF Review Workspace (Multi-Language)</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <link href="css/output.css" rel="stylesheet">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        primary: "#3b82f6",
-                        "background-light": "#f1f5f9",
-                        "background-dark": "#0f172a",
-                    },
-                    fontFamily: {
-                        sans: ["Inter", "Noto Sans JP", "Noto Sans KR", "sans-serif"],
-                    },
-                    borderRadius: {
-                        DEFAULT: "0.5rem",
-                    },
-                },
-            },
-        };
-    </script>
-    <style type="text/tailwindcss">
+    <script src="config.js"></script>
+    <style>
         body {
             font-family: 'Inter', 'Noto Sans KR', 'Noto Sans JP', sans-serif;
         }
+
         .custom-scrollbar::-webkit-scrollbar {
             width: 4px;
         }
+
         .custom-scrollbar::-webkit-scrollbar-track {
             background: transparent;
         }
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 10px;
         }
+
         .dark .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #475569;
         }
+
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
             font-size: 20px;
         }
+
         .variant-container {
             display: none !important;
         }
+
         /* Default state: show EN if no hash or if EN is targeted */
         #variant-en {
             display: flex !important;
         }
+
         /* Hide EN if another variant is targeted */
         body:has(#variant-kr:target) #variant-en,
         body:has(#variant-jp:target) #variant-en {
             display: none !important;
         }
+
         /* Show targeted variant */
-        #variant-kr:target, #variant-jp:target, #variant-en:target {
+        #variant-kr:target,
+        #variant-jp:target,
+        #variant-en:target {
             display: flex !important;
         }
+
         .lang-dropdown:hover .lang-menu {
             display: block;
         }
+
         .export-dropdown:hover .export-menu {
             display: block;
         }
+
         .markdown-container {
             width: 100%;
             height: auto;
@@ -1311,7 +1306,7 @@
 
                                                     try {
                                                         // Fallback to relative URL if backend is on same host, or hardcode localhost for dev
-                                                        const response = await fetch('http://localhost:5000/api/search_text', {
+                                                        const response = await fetch(API_BASE_URL + '/api/search_text', {
                                                             method: 'POST',
                                                             body: formData
                                                         });
@@ -1973,7 +1968,7 @@
                                                     formData.append('lang', getCurrentLang());
 
                                                     console.log('Sending request to /upload with mode:', mode);
-                                                    const response = await fetch('http://localhost:5000/upload', {
+                                                    const response = await fetch(API_BASE_URL + '/upload', {
                                                         method: 'POST',
                                                         body: formData
                                                     });
@@ -1989,7 +1984,7 @@
 
                                                     const pollStatus = async () => {
                                                         try {
-                                                            const statusRes = await fetch(`http://localhost:5000/api/analysis-status/${jobId}`);
+                                                            const statusRes = await fetch(`${API_BASE_URL}/api/analysis-status/${jobId}`);
                                                             if (!statusRes.ok) throw new Error("Status check failed");
                                                             const jobData = await statusRes.json();
 
@@ -2183,7 +2178,7 @@
                                                 chatMessages.scrollTop = chatMessages.scrollHeight;
 
                                                 try {
-                                                    const response = await fetch('http://localhost:5000/chat', {
+                                                    const response = await fetch(API_BASE_URL + '/chat', {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({ query, lang: lang })

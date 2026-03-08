@@ -1,0 +1,17 @@
+.venv
+.git
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.bat
+.env
+config/vector_store
+config/ReferenceDoc
+clean_version.html
+研究.md
+research.md
+*.png
+*.jpg
+node_modules

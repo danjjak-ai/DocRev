@@ -202,35 +202,44 @@ def background_analysis_task(job_id, pdf_bytes, mode, lang):
         traceback.print_exc()
         update_job_status(job_id, "failed", error=str(e))
 
+# --- Configuration Paths ---
+# Use absolute paths based on script location for GCP compatibility
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+CONFIG_DIR = os.path.join(BASE_DIR, "config")
+PROMPTS_FILE = os.path.join(CONFIG_DIR, "prompts.json")
+NG_WORDS_FILE = os.path.join(CONFIG_DIR, "ng_words_dataset.json")
+
 def load_ng_words():
     """
     Loads NG words from config/ng_words_dataset.json.
     Creates the file with default values if it doesn't exist.
     """
     global NG_WORDS
-    config_dir = "config"
-    config_file = os.path.join(config_dir, "ng_words_dataset.json")
     
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-        print(f"Created directory: {config_dir}")
+    if not os.path.exists(CONFIG_DIR):
+        try:
+            os.makedirs(CONFIG_DIR)
+            print(f"Created directory: {CONFIG_DIR}")
+        except Exception as e:
+            print(f"Error creating directory {CONFIG_DIR}: {e}")
+            return
         
-    if not os.path.exists(config_file):
+    if not os.path.exists(NG_WORDS_FILE):
         default_ng_words = [
             {"word": "最高", "rule": "ガイド라인 第1의3-(2)-① (最上級表現の禁止)", "suggestion": "「最高」などの主観的な最上級表現を避け、客観的なデータに基づいた表現に改めてください。"},
             {"word": "No.1", "rule": "ガイド라인 第1의3-(2)-① (最上級表現の禁止)", "suggestion": "根拠なし에 順位를 強調하는 表現은 控え、公平한 比較데이터를 示してください。"},
             {"word": "副作用なし", "rule": "ガイド라인 第1의3-(1)-② (安全性の過信・副作用の否定)", "suggestion": "副作用이 없는 것과 같은 表現은 禁止되어 있습니다. 適切한 副作用情報와 安全性데이터를 併記해 주세요."}
         ]
         try:
-            with open(config_file, "w", encoding="utf-8") as f:
+            with open(NG_WORDS_FILE, "w", encoding="utf-8") as f:
                 json.dump(default_ng_words, f, ensure_ascii=False, indent=4)
-            print(f"Created default NG words file: {config_file}")
+            print(f"Created default NG words file: {NG_WORDS_FILE}")
         except Exception as e:
             print(f"Error creating default NG words file: {e}")
     
     try:
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as f:
+        if os.path.exists(NG_WORDS_FILE):
+            with open(NG_WORDS_FILE, "r", encoding="utf-8") as f:
                 NG_WORDS = json.load(f)
             print(f"Loaded {len(NG_WORDS)} NG words.")
         else:
@@ -247,26 +256,24 @@ def load_prompts():
     Loads prompts from config/prompts.json.
     """
     global PROMPTS
-    config_file = os.path.join("config", "prompts.json")
-    if os.path.exists(config_file):
+    if os.path.exists(PROMPTS_FILE):
         try:
-            with open(config_file, "r", encoding="utf-8") as f:
+            with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
                 PROMPTS = json.load(f)
             print(f"Loaded prompts for languages: {list(PROMPTS.keys())}")
         except Exception as e:
             print(f"Error loading prompts: {e}")
             PROMPTS = {}
     else:
-        print("WARNING: config/prompts.json not found.")
+        print(f"WARNING: {PROMPTS_FILE} not found.")
         PROMPTS = {}
 
 def save_prompts():
     """
     Saves the global PROMPTS dictionary back to config/prompts.json.
     """
-    config_file = os.path.join("config", "prompts.json")
     try:
-        with open(config_file, "w", encoding="utf-8") as f:
+        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
             json.dump(PROMPTS, f, ensure_ascii=False, indent=4)
         return True
     except Exception as e:
@@ -279,9 +286,8 @@ def save_ng_words():
     """
     Saves the global NG_WORDS list back to config/ng_words_dataset.json.
     """
-    config_file = os.path.join("config", "ng_words_dataset.json")
     try:
-        with open(config_file, "w", encoding="utf-8") as f:
+        with open(NG_WORDS_FILE, "w", encoding="utf-8") as f:
             json.dump(NG_WORDS, f, ensure_ascii=False, indent=4)
         return True
     except Exception as e:

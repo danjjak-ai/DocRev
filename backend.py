@@ -492,16 +492,32 @@ def list_reference_docs():
 def upload_reference_doc():
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "Only PDF files are allowed"}), 400
+    files = request.files.getlist('file')
+    if not files:
+        return jsonify({"error": "No selected files"}), 400
     
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(REF_DOCS_DIR, filename)
-    file.save(file_path)
-    return jsonify({"message": f"Successfully uploaded {filename}", "filename": filename}), 200
+    uploaded_files = []
+    errors = []
+    for file in files:
+        if file.filename == '':
+            continue
+        if not file.filename.lower().endswith('.pdf'):
+            errors.append(f"File {file.filename} is not a PDF")
+            continue
+        
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(REF_DOCS_DIR, filename)
+        file.save(file_path)
+        uploaded_files.append(filename)
+    
+    if errors and not uploaded_files:
+        return jsonify({"error": "No valid PDF files were uploaded", "details": errors}), 400
+    
+    return jsonify({
+        "message": f"Successfully uploaded {len(uploaded_files)} files", 
+        "filenames": uploaded_files,
+        "errors": errors if errors else None
+    }), 200
 
 @app.route('/api/reference-docs/<filename>', methods=['DELETE'])
 def delete_reference_doc(filename):

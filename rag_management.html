@@ -48,11 +48,12 @@
             <h2 class="text-lg font-semibold text-gray-800 mb-6">가이드 문서 목록 (config/ReferenceDoc)</h2>
 
             <div class="mb-6 flex gap-4">
-                <input type="file" id="fileInput" accept=".pdf"
+                <input type="file" id="fileInput" accept=".pdf" multiple
                     class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all cursor-pointer" />
-                <button onclick="uploadFile()"
-                    class="px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl transition-all font-medium whitespace-nowrap">
-                    업로드
+                <button onclick="uploadFile()" id="uploadBtn"
+                    class="px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl transition-all font-medium whitespace-nowrap flex items-center gap-2">
+                    <span id="uploadIcon" class="material-icons text-sm">cloud_upload</span>
+                    <span id="uploadText">업로드</span>
                 </button>
             </div>
 
@@ -145,31 +146,54 @@
 
         async function uploadFile() {
             const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            if (!file) {
+            const files = fileInput.files;
+            if (files.length === 0) {
                 showToast('업로드할 파일을 선택하세요.', true);
                 return;
             }
 
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadIcon = document.getElementById('uploadIcon');
+            const uploadText = document.getElementById('uploadText');
+
+            // UI Feedback
+            uploadBtn.disabled = true;
+            uploadBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            uploadIcon.textContent = 'sync';
+            uploadIcon.classList.add('animate-spin');
+            uploadText.textContent = '업로드 중...';
+
             const formData = new FormData();
-            formData.append('file', file);
+            for (let i = 0; i < files.length; i++) {
+                formData.append('file', files[i]);
+            }
 
             try {
-                const response = await fetch('http://localhost:5000/api/reference-docs/upload', {
+                const response = await fetch(`${API_BASE_URL}/api/reference-docs/upload`, {
                     method: 'POST',
                     body: formData
                 });
                 const result = await response.json();
 
                 if (response.ok) {
-                    showToast('파일이 성공적으로 업로드되었습니다.');
+                    showToast(`${files.length}개의 파일이 성공적으로 업로드되었습니다.`);
                     fileInput.value = '';
                     loadDocs();
                 } else {
                     showToast(result.error || '업로드 실패', true);
+                    if (result.details) {
+                        console.error('Upload errors:', result.details);
+                    }
                 }
             } catch (error) {
+                console.error('Upload Error:', error);
                 showToast('업로드 중 오류가 발생했습니다.', true);
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                uploadIcon.textContent = 'cloud_upload';
+                uploadIcon.classList.remove('animate-spin');
+                uploadText.textContent = '업로드';
             }
         }
 

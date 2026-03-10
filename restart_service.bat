@@ -16,7 +16,7 @@ if not exist ".venv" (
 )
 
 echo [DocRev] Ensuring dependencies...
-.\.venv\Scripts\python.exe -m pip install flask flask-cors pymupdf google-generativeai langchain langchain-community chromadb sentence-transformers langchain-huggingface langchain-chroma langchain-text-splitters python-dotenv --quiet
+.\.venv\Scripts\python.exe -m pip install flask flask-cors pymupdf google-genai langchain langchain-community chromadb sentence-transformers langchain-huggingface langchain-chroma langchain-text-splitters python-dotenv --quiet
 
 echo [DocRev] Opening Application...
 start "" "pdf_comment_workspace.html"

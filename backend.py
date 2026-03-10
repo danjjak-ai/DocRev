@@ -5,7 +5,8 @@ from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -14,6 +15,8 @@ from langchain_core.documents import Document
 import unicodedata
 import re
 import uuid
+import base64
+import io
 from langchain_community.retrievers import BM25Retriever
 
 app = Flask(__name__)
@@ -32,9 +35,10 @@ if not api_key:
 else:
     print("INFO: GEMINI_API_KEY loaded from environment.")
 
-genai.configure(api_key=api_key)
-# gemini-2.5-flash is supported according to local tests
-model = genai.GenerativeModel('gemini-2.5-flash')
+# Initialize Gemini Client
+client = genai.Client(api_key=api_key)
+# Using gemini-3.1-flash-lite-preview as requested (matching available ID)
+MODEL_NAME = 'gemini-3.1-flash-lite-preview'
 
 # Global variable for NG words
 NG_WORDS = []
@@ -68,20 +72,40 @@ def perform_analysis_logic(doc, mode, lang):
     lang_prompts = PROMPTS.get(lang, PROMPTS.get('ko', {}))
     results = []
     
-    # Extract text for RAG and LLM
+    # Extract text and images for multimodal analysis
     all_text = ""
     pages_text_list = []
+    gemini_input_parts = []
+    
+    # Base instructions for multimodal analysis
+    comp_context = """
+    [Multimodal Analysis Instructions]:
+    1. Identify all tables and charts/graphs in the images.
+    2. Extract 'Table' data as structured Markdown format.
+    3. Perform 'Visual Verification': Check if graph trends (e.g. slopes) match text claims (e.g. "sudden improvement").
+    4. Detect 'Absolute Expressions' (e.g. '최고', '최상', '유일', '완치') in both text and images/charts.
+    5. Search for Guideline violations based on the provided [Retrieved Guideline Context].
+    """
+
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
         text = page.get_text()
         all_text += f"--- Page {page_num + 1} ---\n{text}\n\n"
         pages_text_list.append((page_num + 1, text))
+        
+        # Convert page to high-res image (300 DPI)
+        pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+        img_bytes = pix.tobytes("png")
+        gemini_input_parts.append({
+            "mime_type": "image/png",
+            "data": img_bytes
+        })
 
-    # Trigger indexing in background (as it was)
-    doc_id = str(uuid.uuid4())
-    threading.Thread(target=index_pdf_text, args=(doc_id, pages_text_list), daemon=True).start()
+    # Prevent OpenMP Deadlock: Removed unauthorized background indexing of uploaded docs
+    # doc_id = str(uuid.uuid4())
+    # threading.Thread(target=index_pdf_text, args=(doc_id, pages_text_list), daemon=True).start()
 
-    # --- Level 1: Keyword Analysis ---
+    # --- Level 1: Keyword Analysis (OCR + Text Search) ---
     if mode in ['level1', 'both']:
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
@@ -108,13 +132,13 @@ def perform_analysis_logic(doc, mode, lang):
                         "suggestion_label": lang_prompts.get("suggestion_label", "제안")
                     })
 
-    # --- Level 2: AI Review (Gemini + RAG) ---
+    # --- Level 2: Multimodal AI Review (Gemini 1.5 Pro + RAG) ---
     if mode in ['level2', 'both'] and api_key:
         try:
             # 1. 문서에서 관련 컨텍스트 검색 (Query Expansion 적용)
-            base_query = "판매정보제공 가이드라인 허위 과장 비방 금지"
+            base_query = "제약 광고 심의 가이드라인 판매정보제공 가이드라인 허위 과장 비방 금지"
             expanded_query = expand_query_with_gemini(base_query, lang=lang)
-            relevant_docs = retrieve_relevant_context(expanded_query, k=7)
+            relevant_docs = retrieve_relevant_context(expanded_query, k=10)
             retrieved_context = "\n\n".join([f"[Context]: {d.page_content}" for d in relevant_docs])
 
             # 2. Gemini에게 문서 분석 요청
@@ -123,18 +147,48 @@ def perform_analysis_logic(doc, mode, lang):
                 review_prompt_template = PROMPTS.get('en', {}).get('review', "")
             
             if review_prompt_template:
-                prompt = f"""
+                # Add multimodal context to prompt
+                final_prompt = f"""
                 {review_prompt_template}
+
+                {comp_context}
 
                 [Retrieved Guideline Context]:
                 {retrieved_context}
 
                 Whole Document Text:
                 {all_text}
+                
+                Analyze the provided images and text carefully. 
+                Especially, detect if any absolute expressions or prohibited words (e.g., '최고', '최상', '유일', '완치', 'No.1', '副作用なし') appear inside images or graphs.
+                If you find a 'Table' or 'Chart', extract its data as Markdown and include it in the 'reason' or 'suggestion' field.
+                
+                Return results as a JSON list. 
+                Each object MUST contain these exact keys:
+                - "page": integer
+                - "quote": exact text verbatim (for images, use a short descriptive phrase of the visual finding)
+                - "category": string (e.g., "Guideline Violation")
+                - "type": "critical" or "suggestion"
+                - "clause": title of the related rule
+                - "reason": detailed explanation
+                - "suggestion": how to fix
                 """
                 
-                response = model.generate_content(prompt)
+                # Combine prompt with image parts
+                # The new SDK uses a different content structure
+                contents = [final_prompt]
+                for img_part in gemini_input_parts:
+                    contents.append(types.Part.from_bytes(
+                        data=img_part["data"],
+                        mime_type=img_part["mime_type"]
+                    ))
+                
+                response = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=contents
+                )
                 ai_response_text = response.text.strip()
+                print(f"AI Response Raw: {ai_response_text[:200]}...")
                 
                 # Strip markdown blocks if present
                 if ai_response_text.startswith("```json"):
@@ -142,14 +196,35 @@ def perform_analysis_logic(doc, mode, lang):
                 elif ai_response_text.startswith("```"):
                      ai_response_text = ai_response_text.split("```")[1].split("```")[0].strip()
 
-                parsed_results = json.loads(ai_response_text)
+                # Robust JSON Parsing
+                try:
+                    parsed_results = json.loads(ai_response_text)
+                except json.JSONDecodeError:
+                    # Try to extract JSON if there's surrounding text
+                    match = re.search(r'\[.*\]', ai_response_text, re.DOTALL)
+                    if match:
+                        parsed_results = json.loads(match.group())
+                    else:
+                        raise ValueError(f"Failed to parse AI response as JSON: {ai_response_text[:100]}...")
+
+                # Handle if AI returns a dictionary instead of a list
+                if isinstance(parsed_results, dict):
+                    # Look for list-like keys (results, violations, annotations, analysis, data, etc.)
+                    for key in ["results", "violations", "annotations", "analysis", "data"]:
+                        if key in parsed_results and isinstance(parsed_results[key], list):
+                            parsed_results = parsed_results[key]
+                            break
+                    else:
+                        # Otherwise, treat as a single result in a list
+                        parsed_results = [parsed_results]
+
                 if isinstance(parsed_results, list):
+                    print(f"AI Review: Parsed {len(parsed_results)} annotation candidates.")
                     for ann in parsed_results:
                         # Robust page parsing
                         try:
                             page_val = ann.get("page", 1)
                             if isinstance(page_val, str):
-                                import re
                                 match = re.search(r'\d+', page_val)
                                 page_val = int(match.group()) if match else 1
                             page_num_actual = int(page_val)
@@ -158,8 +233,14 @@ def perform_analysis_logic(doc, mode, lang):
                             ann["page"] = 1
 
                         page_idx = ann["page"] - 1
+                        
+                        # Handle alternate keys (keyword vs quote)
+                        if "keyword" in ann and not ann.get("quote"):
+                            ann["quote"] = ann["keyword"]
+                        
                         quote = ann.get("quote", "").strip()
                         
+                        # Match bounding boxes for quotes detected by AI
                         if 0 <= page_idx < len(doc) and quote:
                             page = doc.load_page(page_idx)
                             rects = robust_search_for_quote(page, quote)
@@ -167,7 +248,7 @@ def perform_analysis_logic(doc, mode, lang):
                                 ann["rects"] = [[r.x0, r.y0, r.x1, r.y1] for r in rects]
                                 ann["rect"] = ann["rects"][0]
                         
-                        # Fallbacks...
+                        # High-probability word search fallback
                         if quote and "rects" not in ann:
                             for p_idx in range(len(doc)):
                                 pg = doc.load_page(p_idx)
@@ -182,7 +263,14 @@ def perform_analysis_logic(doc, mode, lang):
                         ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
                         if not ann.get("category"):
                             ann["category"] = ann["ai_review_label"]
+                        
+                        # Ensure fields exist for frontend processing
+                        if not ann.get("clause"): ann["clause"] = ann["ai_review_label"]
+                        if not ann.get("reason"): ann["reason"] = ann.get("comment", "상세 내용 없음")
+                        if not ann.get("suggestion"): ann["suggestion"] = ""
                         results.append(ann)
+                
+                print(f"Level 2 Analysis Complete: Found {len(results)} total violations.")
             else:
                 print(f"No review prompt template for lang {lang}")
         except Exception as e:
@@ -226,9 +314,13 @@ def load_ng_words():
         
     if not os.path.exists(NG_WORDS_FILE):
         default_ng_words = [
-            {"word": "最高", "rule": "ガイド라인 第1의3-(2)-① (最上級表現の禁止)", "suggestion": "「最高」などの主観的な最上級表現を避け、客観的なデータに基づいた表現に改めてください。"},
-            {"word": "No.1", "rule": "ガイド라인 第1의3-(2)-① (最上級表現の禁止)", "suggestion": "根拠なし에 順位를 強調하는 表現은 控え、公平한 比較데이터를 示してください。"},
-            {"word": "副作用なし", "rule": "ガイド라인 第1의3-(1)-② (安全性の過信・副作用の否定)", "suggestion": "副作用이 없는 것과 같은 表現은 禁止되어 있습니다. 適切한 副作用情報와 安全性데이터를 併記해 주세요."}
+            {"word": "最高", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "'최고' 등 주관적인 최상급 표현을 피하고 객관적 데이터에 기반한 표현으로 수정하세요."},
+            {"word": "최고", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "'최고' 등 주관적인 최상급 표현을 피하고 객관적 데이터에 기반한 표현으로 수정하세요."},
+            {"word": "최상", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "'최상' 등 주관적인 최상급 표현을 피하고 객관적 데이터에 기반한 표현으로 수정하세요."},
+            {"word": "유일", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "근거 없는 '유일' 표현은 지양하고 공정한 비교 데이터를 제시하세요."},
+            {"word": "완치", "rule": "가이드라인 제1의3-(1)-② (안전성의 과신·부작용의 부정)", "suggestion": "'완치'와 같이 치료 효과를 보장하거나 과신하게 하는 표현은 금지되어 있습니다."},
+            {"word": "No.1", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "근거 없이 순위를 강조하는 표현은 피하고 객관적인 증거를 제시하세요."},
+            {"word": "副作用なし", "rule": "가이드라인 제1의3-(1)-② (안전성의 과신·부작용의 부정)", "suggestion": "부작용이 없다는 식의 표현은 금지되어 있습니다. 적절한 부작용 정보와 안전성 데이터를 병기해 주세요."}
         ]
         try:
             with open(NG_WORDS_FILE, "w", encoding="utf-8") as f:
@@ -552,20 +644,38 @@ def reconstruct_rag_task():
         files_processed = []
 
         if os.path.exists(REF_DOCS_DIR):
-            for filename in os.listdir(REF_DOCS_DIR):
-                if filename.lower().endswith('.pdf'):
-                    file_path = os.path.join(REF_DOCS_DIR, filename)
-                    doc = fitz.open(file_path)
-                    for page_num in range(len(doc)):
-                        page = doc.load_page(page_num)
-                        text = page.get_text()
-                        chunks = text_splitter.split_text(text)
-                        for chunk in chunks:
-                            documents.append(Document(
-                                page_content=chunk,
-                                metadata={"page": page_num + 1, "doc_id": filename}
-                            ))
-                    files_processed.append(filename)
+            for root, dirs, files in os.walk(REF_DOCS_DIR):
+                for filename in files:
+                    file_path = os.path.join(root, filename)
+                    rel_path = os.path.relpath(file_path, REF_DOCS_DIR)
+                    
+                    if filename.lower().endswith('.pdf'):
+                        doc = fitz.open(file_path)
+                        for page_num in range(len(doc)):
+                            page = doc.load_page(page_num)
+                            text = page.get_text()
+                            chunks = text_splitter.split_text(text)
+                            for chunk in chunks:
+                                documents.append(Document(
+                                    page_content=chunk,
+                                    metadata={"page": page_num + 1, "doc_id": rel_path}
+                                ))
+                        files_processed.append(rel_path)
+                    
+                    elif filename.lower().endswith(('.xml', '.txt', '.md')):
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                # Simple reading for now, could be improved with BS4 for XML
+                                text = f.read()
+                                chunks = text_splitter.split_text(text)
+                                for chunk in chunks:
+                                    documents.append(Document(
+                                        page_content=chunk,
+                                        metadata={"doc_id": rel_path}
+                                    ))
+                            files_processed.append(rel_path)
+                        except Exception as read_err:
+                            print(f"Error reading {file_path}: {read_err}")
         
         if documents:
             vector_store = Chroma.from_documents(
@@ -680,7 +790,7 @@ def retrieve_relevant_context(query, k=5):
             combined.append(doc)
             seen.add(content_hash)
             
-    return combined[:k]
+    return combined[:int(k)]
 
 def expand_query_with_gemini(query, lang='ko'):
     """Uses Gemini to expand the search query for better RAG retrieval."""
@@ -697,7 +807,10 @@ def expand_query_with_gemini(query, lang='ko'):
     Language: {lang}
     """
     try:
-        response = model.generate_content(expansion_prompt)
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=expansion_prompt
+        )
         expanded = response.text.strip()
         print(f"Original Query: {query} -> Expanded: {expanded}")
         return expanded
@@ -767,7 +880,10 @@ def chat_with_document():
         {query}
         """
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt
+        )
         return jsonify({"answer": response.text.strip()}), 200
     except Exception as e:
         print(f"Error in chat endpoint: {e}")

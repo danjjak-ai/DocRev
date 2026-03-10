@@ -359,6 +359,7 @@
             const firstChat = document.querySelector('.prompt-chat');
 
             promptsData[currentPromptLang] = {
+                ...promptsData[currentPromptLang],
                 review: firstReview.value,
                 chat: firstChat.value
             };
@@ -383,6 +384,7 @@
             const firstReview = document.querySelector('.prompt-review');
             const firstChat = document.querySelector('.prompt-chat');
             promptsData[currentPromptLang] = {
+                ...promptsData[currentPromptLang],
                 review: firstReview.value,
                 chat: firstChat.value
             };

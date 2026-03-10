@@ -61,8 +61,38 @@
             display: flex !important;
         }
 
-        .lang-dropdown:hover .lang-menu {
+        .lang-dropdown .lang-menu.show {
             display: block;
+            animation: dropdownFadeIn 0.2s ease-out;
+        }
+
+        @keyframes dropdownFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .lang-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .lang-item:hover {
+            background-color: #f8fafc;
+            color: #3b82f6;
+        }
+
+        .dark .lang-item:hover {
+            background-color: #1e293b;
         }
 
         .export-dropdown:hover .export-menu {
@@ -113,19 +143,19 @@
                     </div>
                     <div class="relative lang-dropdown">
                         <button
-                            class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
-                            <span class="material-symbols-outlined !text-[14px]">language</span>
-                            KR
-                            <span class="material-symbols-outlined !text-[12px]">expand_more</span>
+                            class="lang-dropdown-toggle flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-semibold hover:border-primary/50 hover:shadow-sm transition-all shadow-sm">
+                            <span class="text-base">🇰🇷</span>
+                            <span class="text-slate-700 dark:text-slate-200">한국어 (KR)</span>
+                            <span class="material-symbols-outlined !text-[12px] text-slate-400">expand_more</span>
                         </button>
                         <div
-                            class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                                href="#variant-en">English (EN)</a>
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                                href="#variant-kr">한국어 (KR)</a>
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
-                                href="#variant-jp">日本語 (JP)</a>
+                            class="lang-menu hidden absolute top-full left-0 mt-2 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden border-opacity-50">
+                            <a class="lang-item text-[11px] border-b border-slate-100 dark:border-slate-700"
+                                href="#variant-kr"><span class="text-base">🇰🇷</span> <b>한국어 (KR)</b></a>
+                            <a class="lang-item text-[11px] border-b border-slate-100 dark:border-slate-700"
+                                href="#variant-jp"><span class="text-base">🇯🇵</span> 日本語 (JP)</a>
+                            <a class="lang-item text-[11px]" href="#variant-en"><span class="text-base">🇺🇸</span>
+                                English (EN)</a>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 status-container">
@@ -380,19 +410,19 @@
                     </div>
                     <div class="relative lang-dropdown">
                         <button
-                            class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
-                            <span class="material-symbols-outlined !text-[14px]">language</span>
-                            JP
-                            <span class="material-symbols-outlined !text-[12px]">expand_more</span>
+                            class="lang-dropdown-toggle flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-semibold hover:border-primary/50 hover:shadow-sm transition-all shadow-sm">
+                            <span class="text-base">🇯🇵</span>
+                            <span class="text-slate-700 dark:text-slate-200">日本語 (JP)</span>
+                            <span class="material-symbols-outlined !text-[12px] text-slate-400">expand_more</span>
                         </button>
                         <div
-                            class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                                href="#variant-en">English (EN)</a>
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                                href="#variant-kr">한국어 (KR)</a>
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
-                                href="#variant-jp">日本語 (JP)</a>
+                            class="lang-menu hidden absolute top-full left-0 mt-2 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden border-opacity-50">
+                            <a class="lang-item text-[11px] border-b border-slate-100 dark:border-slate-700"
+                                href="#variant-kr"><span class="text-base">🇰🇷</span> 한국어 (KR)</a>
+                            <a class="lang-item text-[11px] border-b border-slate-100 dark:border-slate-700"
+                                href="#variant-jp"><span class="text-base">🇯🇵</span> <b>日本語 (JP)</b></a>
+                            <a class="lang-item text-[11px]" href="#variant-en"><span class="text-base">🇺🇸</span>
+                                English (EN)</a>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 status-container">
@@ -607,19 +637,19 @@
                     </div>
                     <div class="relative lang-dropdown">
                         <button
-                            class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
-                            <span class="material-symbols-outlined !text-[14px]">language</span>
-                            EN
-                            <span class="material-symbols-outlined !text-[12px]">expand_more</span>
+                            class="lang-dropdown-toggle flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-semibold hover:border-primary/50 hover:shadow-sm transition-all shadow-sm">
+                            <span class="text-base">🇺🇸</span>
+                            <span class="text-slate-700 dark:text-slate-200">English (EN)</span>
+                            <span class="material-symbols-outlined !text-[12px] text-slate-400">expand_more</span>
                         </button>
                         <div
-                            class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                                href="#variant-en">English (EN)</a>
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                                href="#variant-kr">한국어 (KR)</a>
-                            <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
-                                href="#variant-jp">日本語 (JP)</a>
+                            class="lang-menu hidden absolute top-full left-0 mt-2 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden border-opacity-50">
+                            <a class="lang-item text-[11px] border-b border-slate-100 dark:border-slate-700"
+                                href="#variant-kr"><span class="text-base">🇰🇷</span> 한국어 (KR)</a>
+                            <a class="lang-item text-[11px] border-b border-slate-100 dark:border-slate-700"
+                                href="#variant-jp"><span class="text-base">🇯🇵</span> 日本語 (JP)</a>
+                            <a class="lang-item text-[11px]" href="#variant-en"><span class="text-base">🇺🇸</span>
+                                <b>English (EN)</b></a>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 status-container">
@@ -2208,6 +2238,28 @@
 
                                             // Close dropdowns when clicking outside
                                             document.addEventListener('click', (e) => {
+                                                // Language Dropdown
+                                                const isLangBtn = e.target.closest('.lang-dropdown-toggle');
+                                                if (isLangBtn) {
+                                                    const menu = isLangBtn.nextElementSibling;
+                                                    menu.classList.toggle('show');
+                                                    menu.classList.toggle('hidden');
+
+                                                    // Close other lang menus
+                                                    document.querySelectorAll('.lang-menu').forEach(m => {
+                                                        if (m !== menu) {
+                                                            m.classList.add('hidden');
+                                                            m.classList.remove('show');
+                                                        }
+                                                    });
+                                                } else {
+                                                    document.querySelectorAll('.lang-menu').forEach(menu => {
+                                                        menu.classList.add('hidden');
+                                                        menu.classList.remove('show');
+                                                    });
+                                                }
+
+                                                // Export Dropdown
                                                 if (!e.target.closest('.export-dropdown')) {
                                                     document.querySelectorAll('.export-menu').forEach(menu => {
                                                         if (!menu.classList.contains('hidden')) {

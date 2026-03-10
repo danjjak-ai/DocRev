@@ -261,13 +261,24 @@ def perform_analysis_logic(doc, mode, lang):
                                     
                         ann["ai_review_label"] = lang_prompts.get("ai_review_label", "AI 리뷰")
                         ann["suggestion_label"] = lang_prompts.get("suggestion_label", "제안")
+                        
+                        # Use provided category if available, else default to ai_review_label
                         if not ann.get("category"):
-                            ann["category"] = ann["ai_review_label"]
+                            ann["category"] = ann.get("ai_review_label", "AI 리뷰")
                         
                         # Ensure fields exist for frontend processing
-                        if not ann.get("clause"): ann["clause"] = ann["ai_review_label"]
-                        if not ann.get("reason"): ann["reason"] = ann.get("comment", "상세 내용 없음")
-                        if not ann.get("suggestion"): ann["suggestion"] = ""
+                        # Deep Review results should keep reason and suggestion separate for UI flexibility
+                        if not ann.get("clause"): 
+                            ann["clause"] = ann.get("category", "")
+                        
+                        # If 'comment' exists but not 'reason', map it.
+                        if not ann.get("reason"):
+                            ann["reason"] = ann.get("comment", "상세 내용 없음")
+                        
+                        # Ensure 'suggestion' is at least an empty string
+                        if "suggestion" not in ann:
+                            ann["suggestion"] = ""
+                            
                         results.append(ann)
                 
                 print(f"Level 2 Analysis Complete: Found {len(results)} total violations.")

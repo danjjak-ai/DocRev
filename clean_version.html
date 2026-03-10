@@ -914,13 +914,26 @@
 
                                                         const item = document.createElement('div');
                                                         item.className = `p-3 mb-2 rounded-md border bg-slate-50/50 dark:bg-slate-900/30 ${borderStyle} cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors relative`;
+
+                                                        // Build richer content if it's an AI annotation with structured data
+                                                        let commentHtml = `<p class="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">${escapeHtml(ann.comment)}</p>`;
+
+                                                        if (ann.reason || ann.suggestion) {
+                                                            commentHtml = `
+                                                                <div class="space-y-2">
+                                                                    ${ann.reason ? `<div><div class="text-[9px] font-bold text-slate-400 uppercase mb-0.5">${escapeHtml(ann.clause || ann.ai_review_label || 'REASON')}</div><div class="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">${escapeHtml(ann.reason)}</div></div>` : ''}
+                                                                    ${ann.suggestion ? `<div class="pt-1 border-t border-slate-100 dark:border-slate-800"><div class="text-[9px] font-bold text-primary uppercase mb-0.5">${escapeHtml(ann.suggestion_label || 'SUGGESTION')}</div><div class="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">${escapeHtml(ann.suggestion)}</div></div>` : ''}
+                                                                </div>
+                                                            `;
+                                                        }
+
                                                         item.innerHTML = `
                                                                 <div class="flex justify-between items-start mb-1 gap-2">
                                                                     <span class="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${badgeStyle} break-words whitespace-normal text-left">${badgeLabel}</span>
                                                                     <span class="text-[10px] text-slate-400 shrink-0">${ann.type === 'text' ? 'All Pages' : 'P. ' + ann.page}</span>
                                                                 </div>
-                                                                <p class="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">${escapeHtml(ann.comment)}</p>
-                                                                ${ann.referenced_text ? `<div class="mt-2 p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-[10px] text-slate-500 italic"><div class="font-bold text-[9px] text-blue-400 uppercase mb-1">・ｸ・ｰ ・尖ｬｸ / Reference</div>${escapeHtml(ann.referenced_text)}</div>` : ''}
+                                                                ${commentHtml}
+                                                                ${ann.referenced_text ? `<div class="mt-2 p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-[10px] text-slate-500 italic"><div class="font-bold text-[9px] text-blue-400 uppercase mb-1">인용 텍스트 / Reference</div>${escapeHtml(ann.referenced_text)}</div>` : ''}
                                                                 ${ann.type === 'text' ? `<div class="mt-1 text-[9px] text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded inline-block">"${escapeHtml(ann.keyword)}"</div>` : ''}
                                                             `;
                                                         item.addEventListener('click', () => {
@@ -1758,8 +1771,8 @@
 
                                                 if (Array.isArray(aiAnnotations)) {
                                                     aiAnnotations.forEach(aiAnn => {
-                                                        const categoryMap = { 'critical': '・ｴ・・, 'suggestion': '・ｼ・・ };
-                                                        const defaultCat = categoryMap[aiAnn.type?.toLowerCase()] || '・ｼ・・;
+                                                        const categoryMap = { 'critical': '경고', 'suggestion': '제안' };
+                                                        const defaultCat = categoryMap[aiAnn.type?.toLowerCase()] || '제안';
 
                                                         const newAnn = {
                                                             id: Math.random().toString(36).substr(2, 9),
@@ -1768,10 +1781,20 @@
                                                             keyword: aiAnn.quote,
                                                             rect: aiAnn.rect || (aiAnn.quote ? undefined : { x: 0.1, y: 0.05, w: 0.8, h: 0.05 }),
                                                             category: aiAnn.category || defaultCat,
-                                                            comment: `[${aiAnn.clause || 'AI ・ｬ・ｰ'}]\n${aiAnn.reason || aiAnn.comment || '・・┷ ・ｴ・ｩ ・・搆'}\n\n[・懍譜]\n${aiAnn.suggestion || ''}`,
+                                                            // Keep fields separate for richer rendering
+                                                            clause: aiAnn.clause,
+                                                            reason: aiAnn.reason,
+                                                            suggestion: aiAnn.suggestion,
+                                                            comment: aiAnn.comment || aiAnn.reason || '', // Fallback
+                                                            ai_review_label: aiAnn.ai_review_label || 'AI 리뷰',
+                                                            suggestion_label: aiAnn.suggestion_label || '제안',
                                                             referenced_text: aiAnn.referenced_text,
                                                             isExisting: false
                                                         };
+                                                        // Ensure comment is properly formatted if reason/suggestion are present
+                                                        if (!newAnn.comment && (newAnn.reason || newAnn.suggestion)) {
+                                                            newAnn.comment = `[${newAnn.clause || newAnn.ai_review_label}]\n${newAnn.reason || ''}\n\n[${newAnn.suggestion_label}]\n${newAnn.suggestion || ''}`;
+                                                        }
                                                         annotations.push(newAnn);
                                                     });
                                                     renderAnnotationList();

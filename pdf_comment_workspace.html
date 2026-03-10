@@ -960,6 +960,7 @@
                                             };
 
                                             const renderAnnotationList = () => {
+                                                console.log("Rendering list, annotations:", annotations);
                                                 document.querySelectorAll('.variant-container').forEach(variant => {
                                                     const listContainer = variant.querySelector('section:nth-of-type(2) .flex-1.space-y-2');
                                                     if (listContainer) {
@@ -987,7 +988,7 @@
                                                                  </div>
                                                                  <p class="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">${escapeHtml(ann.comment)}</p>
                                                                  ${ann.referenced_text ? `<div class="mt-2 p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-[10px] text-slate-500 italic"><div class="font-bold text-[9px] text-blue-400 uppercase mb-1">${t.referenceLabel}</div>${escapeHtml(ann.referenced_text)}</div>` : ''}
-                                                                 ${ann.type === 'text' ? `<div class="mt-1 text-[9px] text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded inline-block">"${escapeHtml(ann.keyword)}"</div>` : ''}
+                                                                 ${ann.keyword ? `<div class="mt-1 text-[9px] text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded inline-block">"${escapeHtml(ann.keyword)}"</div>` : ''}
                                                              `;
                                                             item.addEventListener('click', () => {
                                                                 if (currentPageNum !== ann.page) {
@@ -2012,6 +2013,7 @@
                                                     };
 
                                                     const processAnalysisResults = (results) => {
+                                                        console.log("AI Results:", results);
                                                         if (Array.isArray(results)) {
                                                             results.forEach(aiAnn => {
                                                                 const categoryMap = { 'critical': t.catUrgent, 'suggestion': t.catGeneral };
@@ -2023,7 +2025,7 @@
                                                                     id: Math.random().toString(36).substr(2, 9),
                                                                     page: aiAnn.page || 1,
                                                                     type: (aiAnn.rects || aiAnn.rect) ? 'rect' : (aiAnn.quote ? 'text' : 'area'),
-                                                                    keyword: aiAnn.quote,
+                                                                    keyword: aiAnn.quote || aiAnn.keyword,
                                                                     rect: aiAnn.rect,
                                                                     rects: aiAnn.rects,
                                                                     category: aiAnn.category || defaultCat,

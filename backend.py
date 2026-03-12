@@ -20,8 +20,9 @@ import io
 from langchain_community.retrievers import BM25Retriever
 
 app = Flask(__name__)
-# Enable CORS for all domains
-CORS(app)
+# Enable CORS with configured origins
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
+CORS(app, resources={r"/*": {"origins": allowed_origins}})
 
 # Configure Gemini API
 # Load environment variables from .env file
@@ -37,8 +38,8 @@ else:
 
 # Initialize Gemini Client
 client = genai.Client(api_key=api_key)
-# Using gemini-3.1-flash-lite-preview as requested (matching available ID)
-MODEL_NAME = 'gemini-3.1-flash-lite-preview'
+# Using Gemini Model from environment
+MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
 # Global variable for NG words
 NG_WORDS = []
@@ -974,7 +975,7 @@ def ask_question():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("FLASK_PORT", 5000))
     print(f"Starting Flask server on http://0.0.0.0:{port}")
     print("Ensure GEMINI_API_KEY environment variable is set.")
     app.run(debug=True, host='0.0.0.0', port=port)

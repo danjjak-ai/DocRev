@@ -88,18 +88,31 @@ def perform_analysis_logic(doc, mode, lang):
     5. Search for Guideline violations based on the provided [Retrieved Guideline Context].
     """
 
-    for page_num in range(len(doc)):
+    MAX_PAGES = 10
+    total_pages = len(doc)
+    processing_pages = min(total_pages, MAX_PAGES)
+    
+    for page_num in range(processing_pages):
         page = doc.load_page(page_num)
         text = page.get_text()
         all_text += f"--- Page {page_num + 1} ---\n{text}\n\n"
         pages_text_list.append((page_num + 1, text))
-        
-        # Convert page to high-res image (300 DPI)
-        pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
-        img_bytes = pix.tobytes("png")
-        gemini_input_parts.append({
-            "mime_type": "image/png",
-            "data": img_bytes
+
+
+    if total_pages > MAX_PAGES:
+        trunc_msg = {
+            'ko': 'Light Demo에서는 10장 까지만 처리되며, 완전한 처리를 위해서는 프로덕션모드 데모를 요청하세요.',
+            'ja': 'Light Demoでは10ページまで処理されます。完全な処理のためにはプロダクションモードのデモをリクエストしてください。',
+            'en': 'The Light Demo only processes up to 10 pages. Please request a production mode demo for full processing.'
+        }
+        msg = trunc_msg.get(lang, trunc_msg['ko'])
+        results.append({
+            "page": -1,
+            "category": "Notice",
+            "type": "suggestion",
+            "comment": msg,
+            "ai_review_label": "INFO",
+            "suggestion_label": "System"
         })
 
     # Prevent OpenMP Deadlock: Removed unauthorized background indexing of uploaded docs
@@ -108,7 +121,7 @@ def perform_analysis_logic(doc, mode, lang):
 
     # --- Level 1: Keyword Analysis (OCR + Text Search) ---
     if mode in ['level1', 'both']:
-        for page_num in range(len(doc)):
+        for page_num in range(processing_pages):
             page = doc.load_page(page_num)
             ng_meta = lang_prompts.get('ng_violation', PROMPTS.get('ko', {}).get('ng_violation', {}))
             for ng_item in NG_WORDS:
@@ -136,6 +149,16 @@ def perform_analysis_logic(doc, mode, lang):
     # --- Level 2: Multimodal AI Review (Gemini 1.5 Pro + RAG) ---
     if mode in ['level2', 'both'] and api_key:
         try:
+            for page_num in range(processing_pages):
+                page = doc.load_page(page_num)
+                # Convert page to high-res image (300 DPI)
+                pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+                img_bytes = pix.tobytes("png")
+                gemini_input_parts.append({
+                    "mime_type": "image/png",
+                    "data": img_bytes
+                })
+
             # 1. 문서에서 관련 컨텍스트 검색 (Query Expansion 적용)
             base_query = "제약 광고 심의 가이드라인 판매정보제공 가이드라인 허위 과장 비방 금지"
             expanded_query = expand_query_with_gemini(base_query, lang=lang)
@@ -251,7 +274,7 @@ def perform_analysis_logic(doc, mode, lang):
                         
                         # High-probability word search fallback
                         if quote and "rects" not in ann:
-                            for p_idx in range(len(doc)):
+                            for p_idx in range(processing_pages):
                                 pg = doc.load_page(p_idx)
                                 rects = robust_search_for_quote(pg, quote)
                                 if rects:

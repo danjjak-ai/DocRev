@@ -169,6 +169,11 @@
                             <span class="material-symbols-outlined !text-[14px]">auto_awesome</span>
                             심층 리뷰
                         </button>
+                        <button data-mode="both"
+                            class="btn-request-ai flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[11px] font-medium transition-colors">
+                            <span class="material-symbols-outlined !text-[14px]">done_all</span>
+                            전체 리뷰
+                        </button>
                         <div id="rag-status" class="rag-status hidden flex items-center gap-1">
                             <span
                                 class="material-symbols-outlined animate-spin !text-[10px] text-purple-400">sync</span>
@@ -436,6 +441,11 @@
                             <span class="material-symbols-outlined !text-[14px]">auto_awesome</span>
                             深層レビュー
                         </button>
+                        <button data-mode="both"
+                            class="btn-request-ai flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[11px] font-medium transition-colors">
+                            <span class="material-symbols-outlined !text-[14px]">done_all</span>
+                            全体レビュー
+                        </button>
                         <div class="rag-status hidden flex items-center gap-1">
                             <span
                                 class="material-symbols-outlined animate-spin !text-[10px] text-purple-400">sync</span>
@@ -662,6 +672,11 @@
                             class="btn-request-ai flex items-center gap-1 px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-[11px] font-medium transition-colors">
                             <span class="material-symbols-outlined !text-[14px]">auto_awesome</span>
                             Deep Review
+                        </button>
+                        <button data-mode="both"
+                            class="btn-request-ai flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[11px] font-medium transition-colors">
+                            <span class="material-symbols-outlined !text-[14px]">done_all</span>
+                            Both
                         </button>
                         <div class="rag-status hidden flex items-center gap-1">
                             <span
@@ -1415,7 +1430,10 @@
                                                     return;
                                                 }
                                                 if (e.target.closest('.btn-next-page')) {
-                                                    if (currentPdfDoc && currentPageNum < currentPdfDoc.numPages) {
+                                                    const maxPageLimit = 10;
+                                                    const actualTotal = currentPdfDoc ? currentPdfDoc.numPages : 0;
+                                                    const displayTotal = Math.min(actualTotal, maxPageLimit);
+                                                    if (currentPdfDoc && currentPageNum < displayTotal) {
                                                         currentPageNum++;
                                                         updatePageDisplay();
                                                     }
@@ -1471,7 +1489,15 @@
                                                             annotations = []; // clear previous
 
                                                             // Pass 1: Extract Existing Annotations
-                                                            for (let i = 1; i <= pdf.numPages; i++) {
+                                                            const maxPreviewPages = 10;
+                                                            if (pdf.numPages > maxPreviewPages) {
+                                                                const lang = getCurrentLang();
+                                                                const t = translations[lang] || translations['ko'];
+                                                                // alert(t.pageLimitReached.replace('{limit}', maxPreviewPages));
+                                                            }
+                                                            const totalProcessPages = Math.min(pdf.numPages, maxPreviewPages);
+
+                                                            for (let i = 1; i <= totalProcessPages; i++) {
                                                                 try {
                                                                     const page = await pdf.getPage(i);
                                                                     const pageAnns = await page.getAnnotations();
@@ -1863,35 +1889,38 @@
                                             };
 
                                             const translations = {
+                                                
                                                 ko: {
-                                                    chatTitle: '문서 기반 Q&A',
-                                                    chatPlaceholder: '질문을 입력하세요...',
+                                                    chatTitle: '문서 분석 Q&A',
+                                                    chatPlaceholder: '질문을 입력해주세요...',
                                                     chatGenerating: '답변을 생성 중입니다...',
-                                                    chatError: '서버와 통신 중 오류가 발생했습니다.',
+                                                    chatError: '서버와의 통신 중에 에러가 발생했습니다.',
                                                     chatNoAnswer: '답변을 가져오지 못했습니다.',
-                                                    chatWelcome: '안녕하세요! 분석된 문서 내용에 대해 궁금한 점을 물어보세요.',
+                                                    chatWelcome: '안녕하세요! 분석된 문서의 내용에 대해 질문해주세요.',
                                                     aiAnalyzing: '분석 중...',
                                                     aiCompleted: 'AI 분석이 완료되었습니다. 주석 목록을 확인해주세요.',
                                                     noFile: 'PDF 파일을 먼저 업로드해주세요.',
-                                                    parsingError: 'AI 응답을 파싱할 수 없습니다.',
+                                                    parsingError: 'AI 응답을 해석하지 못했습니다.',
                                                     existingLabel: '[기존]',
-                                                    referenceLabel: '참조 원문',
+                                                    referenceLabel: '참조 텍스트',
                                                     allPages: '전체 페이지',
                                                     pageTemplate: '{current} / {total} 페이지',
                                                     noExport: '내보낼 주석이 없습니다.',
-                                                    enterComment: '주석 내용을 입력하세요.',
-                                                    enterKeyword: '검색할 키워드를 입력하세요.',
-                                                    selectArea: 'PDF 뷰어에서 마우스를 드래그하여 영역을 선택해주세요.',
-                                                    loadingLib: 'PDF 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해주세요.',
-                                                    loadFileFail: '파일을 불러오는 데 실패했습니다.',
+                                                    enterComment: '주석 내용을 입력해주세요',
+                                                    enterKeyword: '검색 키워드를 입력해주세요',
+                                                    selectArea: 'PDF 뷰어에서 마우스로 영역을 선택해주세요',
+                                                    loadingLib: 'PDF 라이브러리를 로딩 중입니다. 잠시 후 다시 시도해주세요.',
+                                                    loadFileFail: '파일을 불러오지 못했습니다.',
                                                     onlyPdf: 'PDF 파일만 업로드 가능합니다.',
                                                     catGeneral: '일반',
                                                     catUrgent: '긴급',
                                                     aiReviewLabel: 'AI 리뷰',
                                                     suggestionLabel: '제안',
                                                     pageLabel: '페이지',
-                                                    pageFormat: '{page} 페이지'
+                                                    pageFormat: '{page} 페이지',
+                                                    pageLimitReached: '내용이 {limit}페이지를 초과하여, 처음 {limit}페이지까지만 표시 및 분석됩니다.'
                                                 },
+                                                
                                                 ja: {
                                                     chatTitle: 'ドキュメント質疑応答',
                                                     chatPlaceholder: '質問を入力してください...',
@@ -1903,14 +1932,14 @@
                                                     aiCompleted: 'AI分析が完了しました。注釈一覧を確認してください。',
                                                     noFile: 'まずPDFファイルをアップロードしてください。',
                                                     parsingError: 'AIレスポンスを解析できませんでした。',
-                                                    existingLabel: '[既存]',
+                                                    existingLabel: '[既設]',
                                                     referenceLabel: '参照原文',
                                                     allPages: '全ページ',
                                                     pageTemplate: '{current} / {total} ページ',
                                                     noExport: '書き出し可能な注釈がありません。',
                                                     enterComment: '注釈の内容を入力してください。',
                                                     enterKeyword: '検索キーワードを入力してください。',
-                                                    selectArea: 'PDFビューアでマウスをドラッグして領域を選択してください。',
+                                                    selectArea: 'PDFビューアーでマウスをドラッグして領域を選択してください。',
                                                     loadingLib: 'PDFライブラリをロード中です。しばらくしてから再試行してください。',
                                                     loadFileFail: 'ファイルの読み込みに失敗しました。',
                                                     onlyPdf: 'PDFファイルのみアップロード可能です。',
@@ -1919,7 +1948,8 @@
                                                     aiReviewLabel: 'AIレビュー',
                                                     suggestionLabel: '提案',
                                                     pageLabel: 'ページ',
-                                                    pageFormat: '{page} ページ'
+                                                    pageFormat: '{page} ページ',
+                                                    pageLimitReached: 'ドキュメントが{limit}ページを超えています。最初の{limit}ページのみが表示および分析されます。'
                                                 },
                                                 en: {
                                                     chatTitle: 'Document Q&A',
@@ -1948,7 +1978,8 @@
                                                     catGeneral: 'General',
                                                     catUrgent: 'Urgent',
                                                     aiReviewLabel: 'AI Review',
-                                                    suggestionLabel: 'Suggestion'
+                                                    suggestionLabel: 'Suggestion',
+                                                    pageLimitReached: 'The document exceeds {limit} pages. Only the first {limit} pages will be displayed and analyzed.'
                                                 }
                                             };
 
@@ -2045,7 +2076,12 @@
                                                     const processAnalysisResults = (results) => {
                                                         console.log("AI Results:", results);
                                                         if (Array.isArray(results)) {
+                                                            let noticeMsg = null;
                                                             results.forEach(aiAnn => {
+                                                                if (aiAnn.category === 'Notice') {
+                                                                    noticeMsg = aiAnn.comment;
+                                                                    return; // Skip adding to annotations
+                                                                }
                                                                 const categoryMap = { 'critical': t.catUrgent, 'suggestion': t.catGeneral };
                                                                 const defaultCat = categoryMap[aiAnn.type?.toLowerCase()] || t.catGeneral;
                                                                 const aiReviewLabel = aiAnn.ai_review_label || t.aiReviewLabel;
@@ -2067,7 +2103,11 @@
                                                             });
                                                             renderAnnotationList();
                                                             updatePageDisplay();
-                                                            alert(t.aiCompleted);
+                                                            if (noticeMsg) {
+                                                                alert(`${t.aiCompleted}\n\n[Notice]:\n${noticeMsg}`);
+                                                            } else {
+                                                                alert(t.aiCompleted);
+                                                            }
                                                         } else {
                                                             alert(t.parsingError);
                                                         }

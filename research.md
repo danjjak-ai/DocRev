@@ -20,10 +20,11 @@
     *   `rag_management.html`: RAG 목적의 참조 문서(PDF) 업로드 및 Vector DB 재구성 트리거 페이지
     *   `prompt_management.html`: 각 기능(단순 리뷰, 심층 리뷰, 챗봇)에 대한 다국어 프롬프트를 조정하는 대시보드
 *   **`config/` (데이터 저장소)**:
-    *   `ng_words_dataset.json`: NG 단어 규칙 및 제안사항 데이터
-    *   `prompts.json`: 다국어 프롬프트 템플릿 데이터
+    *   `ng_groups.json`, `prompt_groups.json`, `rag_groups.json`: 각 기능별 그룹 관리 메타데이터
+    *   `ng_words/`: 그룹별 NG 단어 데이터 저장 폴더
+    *   `prompts/`: 그룹별 프롬프트 데이터 저장 폴더
     *   `ReferenceDoc/`: RAG를 위한 원본 참조 PDF 문서가 저장되는 폴더
-    *   `vector_store/`: LangChain의 Chroma 벡터 데이터베이스가 영구 저장되는 폴더
+    *   `vector_store/`: 그룹별 Chroma 벡터 데이터베이스 저장 폴더
 
 ## 3. 핵심 기능 구현 상세 및 데이터 흐름
 
@@ -44,12 +45,22 @@
 4.  **LLM 추론**: 추출된 가이드라인과 전체 문서 텍스트를 `gemini-2.5-flash` 모델 프롬프트로 주입합니다. LLM은 문서 내에서 가이드라인을 어긴 특정 원문 텍스트(`quote`)와 그 이유 및 제안 사항을 JSON 리스트로 출력합니다.
 5.  **좌표 역매핑 (Fallback Text Search)**: LLM은 공간적 개념(좌표)을 인식하지 못하고 문장(Text)만 반환하므로, 백엔드에서 다시 `PyMuPDF`를 사용하여 대상 문서를 검사하고 반환된 `quote` 문장과 일치하는 시각적 `rect` 좌표를 역으로 찾아 프론트엔드에 전달합니다. (띄어쓰기 예외 대응을 위해 Prefix Search 폴백 로직 포함)
 
-### 3.4. 문서 Q&A 채팅 (`/chat`)
+### 3.4. 리뷰 모드 및 그룹 연동 (Review Modes & Groups)
+*   **리뷰 실행 모드 (Simple/Deep/Both)**: 사용자는 UI에서 단순 리뷰(`level1`), 심층 리뷰(`level2`), 전체 리뷰(`both`) 버튼을 클릭하여 리뷰를 실행할 수 있습니다. 프론트엔드는 이 모드 정보(`mode`)와 함께 사용자가 선택한 각각의 그룹 ID(`rag_group_id`, `ng_group_id`, `prompt_group_id`)를 `/upload` (POST) API로 전송합니다. 백엔드(`perform_analysis_logic`)는 `mode in ['level1', 'both']` 와 `mode in ['level2', 'both']` 분기를 통해 단일 혹은 복합 리뷰 파이프라인을 실행하여 결과를 병합(`results.append`)합니다.
+*   **비동기 폴링 (Async Polling)**: 리뷰 요청 시 백엔드는 즉시 `job_id`를 반환하며 작업을 백그라운드 스레드로 넘기고, 프론트엔드는 3초 주기로 `/api/analysis-status/<job_id>`를 폴링하며 완료 여부를 체크합니다. 완료 시 `processAnalysisResults`를 호출해 `renderAnnotationList()`로 화면에 주석을 렌더링합니다.
+
+### 3.5. 문서 Q&A 채팅 (`/chat`)
 *   사용자의 질문 텍스트가 인입되면 내부적으로 쿼리를 재확장하고, 임의 생성된 대상 문서 벡터 스토어에서 직접 컨텍스트를 검색하여 Gemini 모델로 답변을 생성합니다. (단기 기억에 대한 Session Memory 관리는 프론트엔드에서 주고받는 대화 내역에 의존적으로 동작합니다.)
 
-### 3.5. 대용량 파일 및 리소스 제어 (성능 최적화)
-*   **10페이지 제한 분석 처리**: 사용자가 업로드한 문서가 매우 클 경우 프론트엔드 렌더링 및 백엔드(Gemini LLM / RAG) 분석 시간과 토큰 비용이 급증하는 것을 막기 위해, 분석 및 표시 대상을 최대 10페이지(`MAX_PAGES = 10`)로 하드 리밋(hard limit)을 걸어두었습니다.
-*   **다국어 안내 메시지**: 10페이지를 초과하는 문서를 업로드했을 때, 시스템 레벨에서 해당 언어(ko/en/ja)에 맞게 사용자에게 제한 안내 메시지를 표시하여 혼동을 방지합니다.
+### 3.6. 다국어 그룹 관리 (Multi-Group Management)
+*   **통합 관리 아키텍처**: NG 단어, 프롬프트, RAG 참조 문서를 각각 독립적인 '그룹'으로 관리할 수 있는 체계를 도입했습니다. 프론트엔드 화면 좌측의 '분석 그룹 선택(Analysis Group Selection)' 섹션에서 각 기능을 어떤 그룹 데이터 기준으로 실행할지 선택합니다.
+*   **엔티티 분리**: 각 그룹은 고유한 UUID(또는 단축 ID)를 가지며, 해당 그룹 전용 JSON 파일이나 디렉토리(벡터 DB)를 소유합니다.
+*   **자동 마이그레이션**: 기존 단일 파일 체제(예: `ng_words_dataset.json`)에서 그룹 체제로의 전환을 위해, 서버 기동 시 기존 파일을 `default` 그룹으로 자동 마이그레이션하는 로직을 포함하고 있습니다.
+
+### 3.7. 커스텀 모달 및 알림 시스템 (Custom UX Enhancement)
+*   **Native Dialog 대체**: 브라우저 기본 `prompt()`, `confirm()`, `alert()`는 사용자 환경(팝업 차단 등)에 따라 동작이 불안정할 수 있어, Tailwind CSS 기반의 **커스텀 모달(`custom-modal`)**로 전면 교체했습니다.
+*   **Toast Notification**: 작업 성공/실패 여부를 사용자에게 직관적으로 알리기 위해 화면 하단에 부드럽게 나타나는 토스트 알림을 구현했습니다.
+*   **비동기 제어**: 모달의 확인/취소 버튼을 `Promise` 및 콜백 방식으로 제어하여 비동기 API 요청(`fetch`)과 자연스럽게 연동됩니다.
 
 ## 4. 아키텍처 및 소스코드 상세 개선 포인트
 
@@ -89,6 +100,17 @@
     1. 백엔드에서 `TokenLimitExceeded`, `PDFParsingError`, `SearchFailed` 와 같이 명확한 도메인 에러 클래스를 설계하고 `JSON Response` 내부에 구체적인 에러 Code와 디버깅 메세지를 내려주어야 합니다.
     2. 프론트엔드 레이어에서는 Retry 메커니즘을 부여하고, 화면에 원인이 명시된 안내 팝업을 제공하여 사용자 경험(UX)을 손상시키지 않게 설계합니다.
 
-### 4.6. 다국어 프론트엔드 UI 중복 코드 제거 (DRY Principle)
-*   **문제점**: `pdf_comment_workspace.html`, `clean_version.html`, 관리자 대시보드 `.html` 파일마다 모달 UI 로직, 언어 토글 로직, API 호출 코드가 중복되어 배포되어 있습니다.
-*   **개선안**: Vanilla JS 스크립트를 여러 파일(`api.js`, `ui.js`, `i18n.js`) 모듈로 캡슐화시켜 HTML `<script src="...">` 로 불러오게 분리하면 코드 중복 방지 및 유지관리가 획기적으로 향상됩니다.
+### 4.6. 프론트엔드 UI 컴포넌트 결합도 문제 해결 (Decoupling UI Logic)
+*   **문제점 (버그 리포트)**: 
+    1. **그룹 선택 값 누락**: 현재 `pdf_comment_workspace.html`의 리뷰 실행 버튼 클릭 시 활성화된 언어 탭(`variant-container`)의 그룹 선택 값을 읽어오기 위해 `[style*="display: flex"]` 속성 선택자를 사용합니다. 하지만 다국어 탭 전시는 CSS의 `:target` 가상 클래스를 통해 제어되므로 인라인 style 속성이 없어 항상 null을 반환하고 백엔드로 `default` 그룹이 전송되는 심각한 버그가 존재합니다.
+    2. **주석 렌더링 누락**: `renderAnnotationList` 함수에서 주석 목록을 표시할 DOM 요소를 찾기 위해 구조적 가상 선택자(`section:nth-of-type(2)`)에 강하게 의존하고 있습니다. 최근 '분석 그룹 선택' `<section>`이 상단에 추가되면서 주석 목록 컨테이너가 3번째 요소(`nth-of-type(3)`)로 밀려났고, 이로 인해 DOM 탐색 실패 및 주석 화면 렌더링이 작동하지 않는 버그가 발생했습니다.
+*   **개선안**:
+    1. 현재 로그인/언어 상태를 관리하는 `getCurrentLang()` 등을 활용해 활성 컨테이너(`#variant-kr` 등)의 ID로 직접 명시적 하위 DOM 탐색을 수행해야 합니다.
+    2. HTML 요소 식별 시 `nth-of-type` 같은 형제 순서 기반의 깨지기 쉬운(fragile) 선택자를 지양하고, 고유한 의미를 갖는 CSS 클래스명(예: `.annotation-list-container`)을 부여하여 요소를 식별하도록 리팩토링해야 합니다.
+
+### 4.7. 다국어 프론트엔드 UI 및 일본어 번역 정교화 - [일부 적용 완료]
+*   **구현 내용**: 
+    1. 각 관리자 페이지(`ng_words`, `prompt`, `rag`)의 일본어 번역 루틴을 검토하여 부자연스러운 표현과 한글 잔재를 제거했습니다.
+    2. 관리자 페이지 내 불필요한 아이콘 및 가독성을 해치는 UI 요소를 정리했습니다.
+*   **남은 과제**: 
+    1. Vanilla JS 스크립트를 여러 파일(`api.js`, `ui.js`, `i18n.js`) 모듈로 캡슐화시켜 HTML `<script src="...">` 로 불러오게 분리하면 코드 중복 방지 및 유지관리가 획기적으로 향상됩니다.

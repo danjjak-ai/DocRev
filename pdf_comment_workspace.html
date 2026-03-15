@@ -247,6 +247,33 @@
                 </div>
             </div>
             <div class="flex-1 flex flex-col gap-2 min-w-[320px] max-w-[400px] min-h-0">
+                <!-- Group Selection Section -->
+                <section class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 foldable-section">
+                    <div class="flex items-center justify-between mb-3 cursor-pointer foldable-toggle">
+                        <h2 class="text-sm font-semibold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">settings_input_component</span>
+                            분석 그룹 선택
+                        </h2>
+                        <button class="text-slate-400 p-1 rounded-full transition-colors">
+                            <span class="material-symbols-outlined !text-[18px] toggle-icon">expand_more</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3 foldable-content">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">RAG 그룹 (벡터 DB)</label>
+                            <select class="select-rag-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">NG 단어 그룹</label>
+                            <select class="select-ng-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">프롬프트 그룹</label>
+                            <select class="select-prompt-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                    </div>
+                </section>
+
                 <section
                     class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 foldable-section">
                     <div class="flex items-center justify-between mb-3 cursor-pointer foldable-toggle">
@@ -308,7 +335,7 @@
                         <button class="text-slate-400 p-1 rounded-full transition-colors"><span
                                 class="material-symbols-outlined !text-[18px] toggle-icon">expand_more</span></button>
                     </div>
-                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 foldable-content min-h-0">
+                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 foldable-content min-h-0 annotation-list-container">
                         <!-- Dynamic Content -->
                     </div>
                 </section>
@@ -520,6 +547,33 @@
                 </div>
             </div>
             <div class="flex-1 flex flex-col gap-2 min-w-[320px] max-w-[400px] min-h-0">
+                <!-- Group Selection Section -->
+                <section class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 foldable-section">
+                    <div class="flex items-center justify-between mb-3 cursor-pointer foldable-toggle">
+                        <h2 class="text-sm font-semibold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">settings_input_component</span>
+                            分析グループ選択
+                        </h2>
+                        <button class="text-slate-400 p-1 rounded-full transition-colors">
+                            <span class="material-symbols-outlined !text-[18px] toggle-icon">expand_more</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3 foldable-content">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">RAGグループ (ベクトルDB)</label>
+                            <select class="select-rag-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">禁止用語グループ</label>
+                            <select class="select-ng-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">プロンプトグループ</label>
+                            <select class="select-prompt-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                    </div>
+                </section>
+
                 <section
                     class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 foldable-section">
                     <div class="flex items-center justify-between mb-3 cursor-pointer foldable-toggle">
@@ -579,7 +633,7 @@
                         <button class="text-slate-400 p-1 rounded-full transition-colors"><span
                                 class="material-symbols-outlined !text-[18px] toggle-icon">expand_more</span></button>
                     </div>
-                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 foldable-content min-h-0">
+                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 foldable-content min-h-0 annotation-list-container">
                         <!-- Dynamic Content -->
                     </div>
                 </section>
@@ -754,6 +808,33 @@
                 </div>
             </div>
             <div class="flex-1 flex flex-col gap-2 min-w-[320px] max-w-[400px] min-h-0">
+                <!-- Group Selection Section -->
+                <section class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 foldable-section">
+                    <div class="flex items-center justify-between mb-3 cursor-pointer foldable-toggle">
+                        <h2 class="text-sm font-semibold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">settings_input_component</span>
+                            Analysis Group Selection
+                        </h2>
+                        <button class="text-slate-400 p-1 rounded-full transition-colors">
+                            <span class="material-symbols-outlined !text-[18px] toggle-icon">expand_more</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3 foldable-content">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">RAG Group (Vector DB)</label>
+                            <select class="select-rag-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">NG Word Group</label>
+                            <select class="select-ng-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">Prompt Group</label>
+                            <select class="select-prompt-group w-full h-8 px-2 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded text-xs"></select>
+                        </div>
+                    </div>
+                </section>
+
                 <section
                     class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 foldable-section">
                     <div class="flex items-center justify-between mb-3 cursor-pointer foldable-toggle">
@@ -816,7 +897,7 @@
                         <button class="text-slate-400 p-1 rounded-full transition-colors"><span
                                 class="material-symbols-outlined !text-[18px] toggle-icon">expand_more</span></button>
                     </div>
-                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 foldable-content min-h-0">
+                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 foldable-content min-h-0 annotation-list-container">
                         <!-- Dynamic Content -->
                     </div>
                 </section>
@@ -1016,7 +1097,7 @@
                                             const renderAnnotationList = () => {
                                                 console.log("Rendering list, annotations:", annotations);
                                                 document.querySelectorAll('.variant-container').forEach(variant => {
-                                                    const listContainer = variant.querySelector('section:nth-of-type(2) .flex-1.space-y-2');
+                                                    const listContainer = variant.querySelector('.annotation-list-container');
                                                     if (listContainer) {
                                                         listContainer.innerHTML = '';
 
@@ -1350,7 +1431,7 @@
                                                     const file = fileInput && fileInput.files && fileInput.files[0];
 
                                                     if (!file) {
-                                                        alert(t.noFile);
+                                                        openCustomModal(t.chatTitle, t.noFile);
                                                         return;
                                                     }
 
@@ -2045,6 +2126,17 @@
                                                     const mode = btn.dataset.mode || 'both';
                                                     formData.append('mode', mode);
                                                     formData.append('lang', getCurrentLang());
+                                                     
+                                                    // Get selected group IDs
+                                                    const langHash = (getCurrentLang() === 'en') ? 'en' : ((getCurrentLang() === 'ja') ? 'jp' : 'kr');
+                                                    const activeContainerId = `#variant-${langHash}`;
+                                                    const firstVisibleRag = document.querySelector(`${activeContainerId} .select-rag-group`);
+                                                    const firstVisibleNg = document.querySelector(`${activeContainerId} .select-ng-group`);
+                                                    const firstVisiblePrompt = document.querySelector(`${activeContainerId} .select-prompt-group`);
+                                                     
+                                                    formData.append('rag_group_id', firstVisibleRag ? firstVisibleRag.value : 'default');
+                                                    formData.append('ng_group_id', firstVisibleNg ? firstVisibleNg.value : 'default');
+                                                    formData.append('prompt_group_id', firstVisiblePrompt ? firstVisiblePrompt.value : 'default');
 
                                                     console.log('Sending request to /upload with mode:', mode);
                                                     const response = await fetch(API_BASE_URL + '/upload', {
@@ -2285,6 +2377,56 @@
                                                 if (e.key === 'Enter') handleChatSend();
                                             });
 
+                                            // Initialize empty annotation list
+                                            renderAnnotationList();
+
+                                            // Group Selection Logic
+                                            const fetchGroupLists = async () => {
+                                                try {
+                                                    const [ragRes, ngRes, promptRes] = await Promise.all([
+                                                        fetch(API_BASE_URL + '/api/rag/groups'),
+                                                        fetch(API_BASE_URL + '/api/ng-words/groups'),
+                                                        fetch(API_BASE_URL + '/api/prompts/groups')
+                                                    ]);
+
+                                                    const ragGroups = await ragRes.json();
+                                                    const ngGroups = await ngRes.json();
+                                                    const promptGroups = await promptRes.json();
+
+                                                    const populateSelects = (selectors, groups) => {
+                                                        document.querySelectorAll(selectors).forEach(select => {
+                                                            const currentValue = select.value;
+                                                            select.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                                                            if (currentValue && groups.find(g => g.id === currentValue)) {
+                                                                select.value = currentValue;
+                                                            } else if (groups.length > 0) {
+                                                                select.value = groups[0].id;
+                                                            }
+                                                        });
+                                                    };
+
+                                                    populateSelects('.select-rag-group', ragGroups);
+                                                    populateSelects('.select-ng-group', ngGroups);
+                                                    populateSelects('.select-prompt-group', promptGroups);
+
+                                                } catch (err) {
+                                                    console.error('Error fetching group lists:', err);
+                                                }
+                                            };
+
+                                            // Sync selections across variants
+                                            document.addEventListener('change', (e) => {
+                                                if (e.target.classList.contains('select-rag-group')) {
+                                                    document.querySelectorAll('.select-rag-group').forEach(s => s.value = e.target.value);
+                                                } else if (e.target.classList.contains('select-ng-group')) {
+                                                    document.querySelectorAll('.select-ng-group').forEach(s => s.value = e.target.value);
+                                                } else if (e.target.classList.contains('select-prompt-group')) {
+                                                    document.querySelectorAll('.select-prompt-group').forEach(s => s.value = e.target.value);
+                                                }
+                                            });
+
+                                            fetchGroupLists();
+
                                             // Close dropdowns when clicking outside
                                             document.addEventListener('click', (e) => {
                                                 // Language Dropdown
@@ -2348,6 +2490,33 @@
                                             });
                                         });
                                     </script>
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <h3 id="customModalTitle" class="text-lg font-bold text-slate-900 dark:text-slate-100">알림</h3>
+                <button onclick="closeCustomModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 text-center">
+                <p id="customModalMessage" class="text-slate-600 dark:text-slate-300"></p>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="closeCustomModal()" 
+                        class="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-blue-500/20">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"
+        class="fixed bottom-8 right-8 z-[300] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-4 flex items-center gap-3 transition-all transform translate-y-20 opacity-0 pointer-events-none">
+        <div class="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center">
+            <span id="toastIcon" class="material-symbols-outlined text-green-500">check_circle</span>
+        </div>
+        <p id="toastMessage" class="text-sm font-bold text-slate-700 dark:text-slate-200"></p>
+    </div>
 </body>
 
 </html>

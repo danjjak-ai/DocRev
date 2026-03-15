@@ -2,19 +2,29 @@
 <html lang="ko">
 
 <head>
-    <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>NG Word Management - PDF Review Workspace</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NG Word Management - DocRev</title>
     <link href="css/output.css" rel="stylesheet">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
-        rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="config.js"></script>
     <style>
         body {
-            font-family: 'Inter', 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(229, 231, 235, 0.5);
+        }
+
+        .sidebar-item.active {
+            background-color: #eef2ff;
+            color: #4f46e5;
+            border-right: 4px solid #4f46e5;
         }
 
         .custom-scrollbar::-webkit-scrollbar {
@@ -29,646 +39,650 @@
             background: #cbd5e1;
             border-radius: 10px;
         }
-
-        .variant-container {
-            display: none !important;
-        }
-
-        #variant-en {
-            display: block !important;
-        }
-
-        body:has(#variant-kr:target) #variant-en,
-        body:has(#variant-jp:target) #variant-en {
-            display: none !important;
-        }
-
-        #variant-kr:target,
-        #variant-jp:target,
-        #variant-en:target {
-            display: block !important;
-        }
-
-        .lang-dropdown:hover .lang-menu {
-            display: block;
-        }
     </style>
 </head>
 
-<body
-    class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200">
-
-    <!-- Korean Variant -->
-    <div class="variant-container max-w-4xl mx-auto p-4 sm:p-8" id="variant-kr">
-        <header class="flex items-center justify-between mb-8">
+<body class="min-h-screen text-gray-800 flex flex-col h-screen overflow-hidden">
+    <!-- Header -->
+    <header class="bg-white shadow-sm z-50">
+        <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="bg-primary p-2 rounded-lg text-white">
-                    <span class="material-symbols-outlined">block</span>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight">금지어 관리</h1>
-                    <p class="text-xs text-slate-500">문서 분석 시 필터링할 금지어를 관리하세요</p>
-                </div>
-                <div class="relative lang-dropdown ml-4">
-                    <button
-                        class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
-                        <span class="material-symbols-outlined !text-[14px]">language</span>
-                        KR
-                        <span class="material-symbols-outlined !text-[12px]">expand_more</span>
-                    </button>
-                    <div
-                        class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                            href="#variant-en">English (EN)</a>
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                            href="#variant-kr">한국어 (KR)</a>
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
-                            href="#variant-jp">日本語 (JP)</a>
-                    </div>
-                </div>
+                <span class="material-icons text-indigo-600 text-3xl">block</span>
+                <h1 id="titleText"
+                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
+                    금지어 관리</h1>
             </div>
-            <a href="pdf_comment_workspace.html#variant-kr"
-                class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
-                <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
-                워크스페이스로 돌아가기
-            </a>
-        </header>
+            <div class="flex items-center gap-4">
+                <!-- Language Selector -->
+                <div class="relative group">
+                    <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+                        <span class="material-icons text-gray-500 text-lg">language</span>
+                        <span id="currentLang" class="text-sm font-medium">한국어</span>
+                    </button>
+                    <div class="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-xl border border-gray-100 hidden group-hover:block overflow-hidden">
+                        <button onclick="setLanguage('ko')" class="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 transition-colors">한국어</button>
+                        <button onclick="setLanguage('en')" class="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 transition-colors">English</button>
+                        <button onclick="setLanguage('ja')" class="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 transition-colors">日本語</button>
+                    </div>
+                </div>
 
-        <main class="space-y-6">
-            <section
-                class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary !text-[18px]">add_circle</span>
-                    새 금지어 추가
-                </h2>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase">금지어</label>
-                            <input
-                                class="new-word-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                type="text" placeholder="예: 최고, No.1">
+                <a href="pdf_comment_workspace.html" id="backToWorkspace"
+                    class="flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                    <span class="material-icons text-sm">arrow_back</span>
+                    <span class="text-sm font-medium">워크스페이스로 돌아가기</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-r border-gray-200 flex flex-col">
+            <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 id="sidebarTitle" class="font-bold text-gray-700">금지어 그룹</h3>
+                <button onclick="createNewGroup()" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                    <span class="material-icons">add_circle</span>
+                </button>
+            </div>
+            <nav id="groupList" class="flex-1 overflow-y-auto py-2">
+                <!-- Groups will be listed here -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto p-8">
+            <div id="noSelection" class="flex flex-col items-center justify-center h-full text-gray-400 hidden">
+                <span class="material-icons text-6xl mb-4">folder_open</span>
+                <p id="noSelectionText">그룹을 선택하거나 새로 만드세요.</p>
+            </div>
+
+            <div id="mainContent" class="max-w-5xl mx-auto space-y-6">
+                <!-- Group Header Info -->
+                <div class="glass-panel rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <h2 id="selectedGroupName" class="text-2xl font-bold text-gray-900">-</h2>
+                            <button onclick="renameCurrentGroup()" class="text-gray-400 hover:text-indigo-600 transition-colors">
+                                <span class="material-icons text-lg">edit</span>
+                            </button>
                         </div>
-                        <div class="space-y-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase">가이드라인 조항</label>
-                            <input
-                                class="new-rule-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                type="text" placeholder="예: 가이드라인 제1의 3-(2)-①">
+                        <p id="groupDescription" class="text-sm text-gray-500 mt-1">선택된 금지어 그룹의 데이터를 관리합니다.</p>
+                    </div>
+                    <button onclick="deleteCurrentGroup()" id="deleteGroupBtn" class="px-3 py-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center gap-1">
+                        <span class="material-icons text-sm">delete</span>
+                        <span id="deleteGroupText">그룹 삭제</span>
+                    </button>
+                </div>
+
+                <!-- Add New Word Section -->
+                <div class="glass-panel rounded-2xl p-6 shadow-sm">
+                    <h3 id="addWordTitle" class="text-lg font-semibold text-gray-800 mb-6">새 금지어 추가</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="space-y-2">
+                            <label id="labelWord" class="text-xs font-bold text-gray-500 uppercase">금지어</label>
+                            <input type="text" id="newWordInput" placeholder="예: 최고, No.1" 
+                                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                        </div>
+                        <div class="space-y-2">
+                            <label id="labelRule" class="text-xs font-bold text-gray-500 uppercase">가이드라인 조항</label>
+                            <input type="text" id="newRuleInput" placeholder="예: 제1조 2항" 
+                                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
                         </div>
                     </div>
-                    <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase">수정 제안 (가이드라인 위반 이유 추천 문구)</label>
-                        <textarea
-                            class="new-suggestion-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                            rows="2" placeholder="사용자에게 표시될 수정 권고 문구를 입력하세요..."></textarea>
+                    <div class="space-y-2 mb-6">
+                        <label id="labelSuggestion" class="text-xs font-bold text-gray-500 uppercase">수정 제안</label>
+                        <textarea id="newSuggestionInput" rows="2" placeholder="사용자에게 표시될 권고 문구..."
+                            class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"></textarea>
                     </div>
                     <div class="flex justify-end">
-                        <button
-                            class="add-word-btn bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
-                            <span class="material-symbols-outlined !text-[18px]">add</span>
-                            추가하기
+                        <button onclick="addWord()" class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2">
+                            <span class="material-icons">add</span>
+                            <span id="addBtnText">추가하기</span>
                         </button>
                     </div>
                 </div>
-            </section>
 
-            <section
-                class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div
-                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
-                    <h2 class="text-sm font-semibold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
-                        현재 금지어 목록
-                    </h2>
-                    <span
-                        class="word-count text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0개</span>
-                </div>
-                <div
-                    class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
-                    <div class="col-span-3">금지어</div>
-                    <div class="col-span-3">가이드라인 조항</div>
-                    <div class="col-span-5">수정 제안</div>
-                    <div class="col-span-1 text-right">작업</div>
-                </div>
-                <div
-                    class="words-list divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
-                </div>
-                <div class="empty-state hidden py-12 text-center">
-                    <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
-                    <p class="text-sm text-slate-500">등록된 금지어가 없습니다.</p>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- Japanese Variant -->
-    <div class="variant-container max-w-4xl mx-auto p-4 sm:p-8" id="variant-jp">
-        <header class="flex items-center justify-between mb-8">
-            <div class="flex items-center gap-3">
-                <div class="bg-primary p-2 rounded-lg text-white">
-                    <span class="material-symbols-outlined">block</span>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight">禁止用語管理</h1>
-                    <p class="text-xs text-slate-500">文書分析時にフィルタリングする禁止用語を管理してください</p>
-                </div>
-                <div class="relative lang-dropdown ml-4">
-                    <button
-                        class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
-                        <span class="material-symbols-outlined !text-[14px]">language</span>
-                        JP
-                        <span class="material-symbols-outlined !text-[12px]">expand_more</span>
-                    </button>
-                    <div
-                        class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                            href="#variant-en">English (EN)</a>
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                            href="#variant-kr">한국어 (KR)</a>
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
-                            href="#variant-jp">日本語 (JP)</a>
+                <!-- Word List Table -->
+                <div class="glass-panel rounded-2xl shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                        <h3 id="listTitle" class="font-bold text-gray-700">금지어 목록</h3>
+                        <span id="wordCount" class="text-xs font-bold bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">0개</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50/50 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                <tr>
+                                    <th id="thWord" class="px-6 py-4">금지어</th>
+                                    <th id="thRule" class="px-6 py-4">가이드라인</th>
+                                    <th id="thSuggestion" class="px-6 py-4">수정 제안</th>
+                                    <th class="px-6 py-4 text-right">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wordsTableBody" class="divide-y divide-gray-100 bg-white">
+                                <!-- Data will be here -->
+                            </tbody>
+                        </table>
+                        <div id="emptyList" class="py-20 flex flex-col items-center justify-center text-gray-400 hidden">
+                            <span class="material-icons text-5xl mb-2">search_off</span>
+                            <p id="emptyText">등록된 금지어가 없습니다.</p>
+                        </div>
                     </div>
                 </div>
             </div>
-            <a href="pdf_comment_workspace.html#variant-jp"
-                class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
-                <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
-                ワークスペースに戻る
-            </a>
-        </header>
-
-        <main class="space-y-6">
-            <section
-                class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary !text-[18px]">add_circle</span>
-                    新規禁止用語追加
-                </h2>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase">禁止用語</label>
-                            <input
-                                class="new-word-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                type="text" placeholder="例: 最高, No.1">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase">ガイドライン条項</label>
-                            <input
-                                class="new-rule-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                type="text" placeholder="例: ガイドライン第1の3-(2)-①">
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase">修正案 (ガイドライン違反理由の推奨文言)</label>
-                        <textarea
-                            class="new-suggestion-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                            rows="2" placeholder="ユーザーに表示される修正勧告文言を入力してください..."></textarea>
-                    </div>
-                    <div class="flex justify-end">
-                        <button
-                            class="add-word-btn bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
-                            <span class="material-symbols-outlined !text-[18px]">add</span>
-                            追加する
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <section
-                class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div
-                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
-                    <h2 class="text-sm font-semibold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
-                        現在の禁止用語リスト
-                    </h2>
-                    <span
-                        class="word-count text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0個</span>
-                </div>
-                <div
-                    class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
-                    <div class="col-span-3">禁止用語</div>
-                    <div class="col-span-3">ガイドライン条項</div>
-                    <div class="col-span-5">修正案</div>
-                    <div class="col-span-1 text-right">操作</div>
-                </div>
-                <div
-                    class="words-list divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
-                </div>
-                <div class="empty-state hidden py-12 text-center">
-                    <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
-                    <p class="text-sm text-slate-500">登録された禁止用語はありません。</p>
-                </div>
-            </section>
         </main>
     </div>
-
-    <!-- English Variant -->
-    <div class="variant-container max-w-4xl mx-auto p-4 sm:p-8" id="variant-en">
-        <header class="flex items-center justify-between mb-8">
-            <div class="flex items-center gap-3">
-                <div class="bg-primary p-2 rounded-lg text-white">
-                    <span class="material-symbols-outlined">block</span>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight">NG Word Management</h1>
-                    <p class="text-xs text-slate-500">Manage forbidden words to be filtered during document analysis</p>
-                </div>
-                <div class="relative lang-dropdown ml-4">
-                    <button
-                        class="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium hover:bg-slate-50">
-                        <span class="material-symbols-outlined !text-[14px]">language</span>
-                        EN
-                        <span class="material-symbols-outlined !text-[12px]">expand_more</span>
-                    </button>
-                    <div
-                        class="lang-menu hidden absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50">
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                            href="#variant-en">English (EN)</a>
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700"
-                            href="#variant-kr">한국어 (KR)</a>
-                        <a class="block px-3 py-1.5 text-[11px] hover:bg-slate-50 dark:hover:bg-slate-700"
-                            href="#variant-jp">日本語 (JP)</a>
-                    </div>
-                </div>
-            </div>
-            <a href="pdf_comment_workspace.html#variant-en"
-                class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
-                <span class="material-symbols-outlined !text-[20px]">arrow_back</span>
-                Back to Workspace
-            </a>
-        </header>
-
-        <main class="space-y-6">
-            <section
-                class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary !text-[18px]">add_circle</span>
-                    Add New NG Word
-                </h2>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase">NG Word</label>
-                            <input
-                                class="new-word-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                type="text" placeholder="e.g. Best, No.1">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase">Guideline Clause</label>
-                            <input
-                                class="new-rule-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                type="text" placeholder="e.g. Guideline Clause 1-3-(2)-1">
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase">Suggestion (Reason for
-                            Violation)</label>
-                        <textarea
-                            class="new-suggestion-input w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                            rows="2" placeholder="Enter the suggestion text to be displayed to users..."></textarea>
-                    </div>
-                    <div class="flex justify-end">
-                        <button
-                            class="add-word-btn bg-primary hover:bg-blue-600 text-white font-semibold px-8 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
-                            <span class="material-symbols-outlined !text-[18px]">add</span>
-                            Add
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <section
-                class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div
-                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
-                    <h2 class="text-sm font-semibold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-primary !text-[18px]">list_alt</span>
-                        Current NG Word List
-                    </h2>
-                    <span
-                        class="word-count text-[10px] font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400">0</span>
-                </div>
-                <div
-                    class="grid grid-cols-12 gap-4 px-6 py-2 bg-slate-50 dark:bg-slate-800/20 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
-                    <div class="col-span-3">NG Word</div>
-                    <div class="col-span-3">Clause</div>
-                    <div class="col-span-5">Suggestion</div>
-                    <div class="col-span-1 text-right">Actions</div>
-                </div>
-                <div
-                    class="words-list divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
-                </div>
-                <div class="empty-state hidden py-12 text-center">
-                    <span class="material-symbols-outlined text-slate-300 !text-[48px] mb-2">search_off</span>
-                    <p class="text-sm text-slate-500">No NG words registered.</p>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <footer class="mt-8 text-center pb-8">
-        <p class="text-[10px] text-slate-400">© 2024 PDF Annotation Workspace • Config Management Module</p>
-    </footer>
 
     <!-- Edit Modal -->
-    <div id="edit-modal"
-        class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div
-            class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
-            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <h3 class="font-bold text-lg modal-title">금지어 수정</h3>
-                <button id="close-modal" class="text-slate-400 hover:text-slate-600"><span
-                        class="material-symbols-outlined">close</span></button>
+    <div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 id="modalTitle" class="font-bold text-lg">금지어 수정</h3>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <span class="material-icons">close</span>
+                </button>
             </div>
             <div class="p-6 space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-old">기존 단어</label>
-                        <p id="old-word-display"
-                            class="bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 text-sm opacity-60">
-                        </p>
+                        <label id="modalOldLabel" class="text-xs font-bold text-gray-400 uppercase">기존 단어</label>
+                        <p id="oldWordDisplay" class="bg-gray-50 p-2 rounded-lg text-sm text-gray-500 border border-gray-100"></p>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-new">새 단어</label>
-                        <input id="edit-word-input" type="text"
-                            class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary">
+                        <label id="modalNewLabel" class="text-xs font-bold text-gray-400 uppercase">새 단어</label>
+                        <input type="text" id="editWordInput" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
                     </div>
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-rule">가이드라인 조항</label>
-                    <input id="edit-rule-input" type="text"
-                        class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary">
+                    <label id="modalRuleLabel" class="text-xs font-bold text-gray-400 uppercase">가이드라인 조항</label>
+                    <input type="text" id="editRuleInput" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[11px] font-bold text-slate-400 uppercase modal-label-suggestion">수정 제안</label>
-                    <textarea id="edit-suggestion-input" rows="3"
-                        class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2 outline-none focus:border-primary"></textarea>
+                    <label id="modalSuggestionLabel" class="text-xs font-bold text-gray-400 uppercase">수정 제안</label>
+                    <textarea id="editSuggestionInput" rows="3" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"></textarea>
                 </div>
             </div>
-            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
-                <button id="cancel-edit"
-                    class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors modal-btn-cancel">취소</button>
-                <button id="save-edit"
-                    class="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-600 rounded-lg transition-colors modal-btn-save">저장하기</button>
+            <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+                <button onclick="closeEditModal()" id="modalCancelBtn" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">취소</button>
+                <button onclick="saveEdit()" id="modalSaveBtn" class="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-lg shadow-indigo-100">저장하기</button>
             </div>
         </div>
     </div>
 
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+                <h3 id="customModalTitle" class="text-lg font-bold text-slate-900">제목</h3>
+                <button onclick="closeCustomModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div id="customModalInputContainer">
+                    <input type="text" id="customModalInput" 
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        onkeypress="if(event.key==='Enter') handleCustomModalConfirm()">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="closeCustomModal()" 
+                        class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold transition-all">취소</button>
+                    <button id="customModalConfirmBtn" onclick="handleCustomModalConfirm()"
+                        class="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-500/20">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-8 right-8 z-[200] bg-white border border-slate-200 rounded-xl shadow-2xl p-4 flex items-center gap-3 transition-all transform translate-y-20 opacity-0 pointer-events-none">
+        <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
+            <span id="toastIcon" class="material-icons text-green-500">check_circle</span>
+        </div>
+        <p id="toastMessage" class="text-sm font-bold text-slate-700"></p>
+    </div>
+
     <script>
-        const API_BASE = API_BASE_URL + "/api/ng-words";
-
-        let currentlyEditing = null;
-        let allWords = [];
-
-        const translations = {
+        const TRANSLATIONS = {
             ko: {
-                editTitle: '금지어 수정',
-                labelOld: '기존 단어',
-                labelNew: '새 단어',
-                labelRule: '가이드라인 조항',
-                labelSuggestion: '수정 제안',
-                btnCancel: '취소',
-                btnSave: '저장하기',
-                confirmDelete: "'{word}'을(를) 정말 삭제하시겠습니까?",
-                errorFetch: '목록을 불러오지 못했습니다.',
-                errorAdd: '추가 실패',
-                errorDelete: '삭제 실패',
-                errorEdit: '수정 실패',
-                inputRequired: '금지어를 입력하세요.',
-                countSuffix: '개'
-            },
-            ja: {
-                editTitle: '禁止用語修正',
-                labelOld: '既存の単語',
-                labelNew: '新しい単語',
-                labelRule: 'ガイドライン条項',
-                labelSuggestion: '修正案',
-                btnCancel: 'キャンセル',
-                btnSave: '保存する',
-                confirmDelete: "'{word}'を本当に削除しますか？",
-                errorFetch: 'リストを読み込めませんでした。',
-                errorAdd: '追加失敗',
-                errorDelete: '削除失敗',
-                errorEdit: '修正失敗',
-                inputRequired: '禁止用語を入力してください。',
-                countSuffix: '個'
+                title: "금지어 관리",
+                back: "워크스페이스",
+                sidebar: "금지어 그룹",
+                noSelection: "그룹을 선택하거나 새로 만드세요.",
+                deleteGroup: "그룹 삭제",
+                groupDesc: "선택된 금지어 그룹의 데이터를 관리합니다.",
+                addTitle: "새 금지어 추가",
+                lWord: "금지어", lRule: "가이드라인 조항", lSuggestion: "수정 제안",
+                addBtn: "추가하기",
+                listTitle: "금지어 목록",
+                thWord: "금지어", thRule: "가이드라인", thSuggestion: "수정 제안",
+                emptyText: "등록된 금지어가 없습니다.",
+                modalTitle: "금지어 수정",
+                mOld: "기존 단어", mNew: "새 단어", mBtnCancel: "취소", mBtnSave: "저장하기",
+                confirmDelete: "삭제하시겠습니까?",
+                groupNamePrompt: "새 그룹 이름을 입력하세요:",
+                renamePrompt: "새 이름을 입력하세요:",
+                currentLangName: "한국어",
+                countSuffix: "개",
+                msgSave: "저장되었습니다.",
+                msgError: "오류가 발생했습니다."
             },
             en: {
-                editTitle: 'Edit NG Word',
-                labelOld: 'Existing Word',
-                labelNew: 'New Word',
-                labelRule: 'Guideline Clause',
-                labelSuggestion: 'Suggestion',
-                btnCancel: 'Cancel',
-                btnSave: 'Save',
-                confirmDelete: "Are you sure you want to delete '{word}'?",
-                errorFetch: 'Failed to fetch the list.',
-                errorAdd: 'Failed to add.',
-                errorDelete: 'Failed to delete.',
-                errorEdit: 'Failed to edit.',
-                inputRequired: 'Please enter an NG word.',
-                countSuffix: ''
+                title: "NG Words Management",
+                back: "Workspace",
+                sidebar: "Word Groups",
+                noSelection: "Select or Create a Group.",
+                deleteGroup: "Delete Group",
+                groupDesc: "Manage NG words for the selected group.",
+                addTitle: "Add New NG Word",
+                lWord: "NG Word", lRule: "Guideline Clause", lSuggestion: "Suggestion",
+                addBtn: "Add Word",
+                listTitle: "Word List",
+                thWord: "Word", thRule: "Guideline", thSuggestion: "Suggestion",
+                emptyText: "No NG words registered.",
+                modalTitle: "Edit NG Word",
+                mOld: "Existing", mNew: "New", mBtnCancel: "Cancel", mBtnSave: "Save",
+                confirmDelete: "Are you sure you want to delete?",
+                groupNamePrompt: "Enter new group name:",
+                renamePrompt: "Enter new name:",
+                currentLangName: "English",
+                countSuffix: "",
+                msgSave: "Saved successfully.",
+                msgError: "An error occurred."
+            },
+            ja: {
+                title: "NG用語管理",
+                back: "ワークスペース",
+                sidebar: "用語グループ",
+                noSelection: "グループを選択するか新しく作成してください。",
+                deleteGroup: "グループ削除",
+                groupDesc: "選択されたNG用語グループのデータを管理します。",
+                addTitle: "新規NG用語追加",
+                lWord: "NG用語", lRule: "ガイドライン条項", lSuggestion: "修正案",
+                addBtn: "追加する",
+                listTitle: "用語リスト",
+                thWord: "NG用語", thRule: "ガイドライン", thSuggestion: "修正案",
+                emptyText: "登録されたNG用語はありません。",
+                modalTitle: "NG用語修正",
+                mOld: "既存", mNew: "新規", mBtnCancel: "キャンセル", mBtnSave: "保存する",
+                confirmDelete: "本当に削除しますか？",
+                groupNamePrompt: "新しいグループ名を入力してください:",
+                renamePrompt: "新しい名前を入力してください:",
+                currentLangName: "日本語",
+                countSuffix: "個",
+                msgSave: "保存されました。",
+                msgError: "エラーが発生しました。"
             }
         };
 
-        const getCurrentLang = () => {
-            const hash = window.location.hash || '#variant-en';
-            if (hash === '#variant-kr') return 'ko';
-            if (hash === '#variant-jp') return 'ja';
-            return 'en';
-        };
+        let currentLang = 'ko';
+        let groups = [];
+        let selectedGroupId = null;
+        let words = [];
+        let currentlyEditingWord = null;
 
-        async function fetchWords() {
+        function setLanguage(lang) {
+            currentLang = lang;
+            const t = TRANSLATIONS[lang];
+            
+            document.getElementById('titleText').textContent = t.title;
+            document.getElementById('backToWorkspace').querySelector('span:last-child').textContent = t.back;
+            document.getElementById('sidebarTitle').textContent = t.sidebar;
+            document.getElementById('noSelectionText').textContent = t.noSelection;
+            document.getElementById('deleteGroupText').textContent = t.deleteGroup;
+            document.getElementById('groupDescription').textContent = t.groupDesc;
+            document.getElementById('addWordTitle').textContent = t.addTitle;
+            document.getElementById('labelWord').textContent = t.lWord;
+            document.getElementById('labelRule').textContent = t.lRule;
+            document.getElementById('labelSuggestion').textContent = t.lSuggestion;
+            document.getElementById('addBtnText').textContent = t.addBtn;
+            document.getElementById('listTitle').textContent = t.listTitle;
+            document.getElementById('thWord').textContent = t.thWord;
+            document.getElementById('thRule').textContent = t.thRule;
+            document.getElementById('thSuggestion').textContent = t.thSuggestion;
+            document.getElementById('emptyText').textContent = t.emptyText;
+            document.getElementById('currentLang').textContent = t.currentLangName;
+            
+            document.getElementById('modalTitle').textContent = t.modalTitle;
+            document.getElementById('modalOldLabel').textContent = t.mOld;
+            document.getElementById('modalNewLabel').textContent = t.mNew;
+            document.getElementById('modalRuleLabel').textContent = t.lRule;
+            document.getElementById('modalSuggestionLabel').textContent = t.lSuggestion;
+            document.getElementById('modalCancelBtn').textContent = t.mBtnCancel;
+            document.getElementById('modalSaveBtn').textContent = t.mBtnSave;
+
+            renderGroups();
+            if (selectedGroupId) renderWords();
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            const icon = document.getElementById('toastIcon');
+            icon.textContent = isError ? 'error' : 'check_circle';
+            icon.className = `material-icons ${isError ? 'text-red-500' : 'text-green-500'}`;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        async function loadGroups() {
             try {
-                const response = await fetch(API_BASE);
-                allWords = await response.json();
-                renderWords(allWords);
+                const res = await fetch(`${API_BASE_URL}/api/ng-words/groups`);
+                groups = await res.json();
+                renderGroups();
+                if (groups.length > 0 && !selectedGroupId) {
+                    selectGroup(groups[0].id);
+                } else if (groups.length === 0) {
+                    updateView(null);
+                }
             } catch (err) {
-                console.error("Fetch error:", err);
-                const t = translations[getCurrentLang()];
-                alert(t.errorFetch);
+                console.error(err);
             }
         }
 
-        function renderWords(words) {
-            const lang = getCurrentLang();
-            const t = translations[lang];
+        function renderGroups() {
+            const list = document.getElementById('groupList');
+            list.innerHTML = '';
+            groups.forEach(g => {
+                const item = document.createElement('div');
+                item.className = `sidebar-item px-6 py-3 cursor-pointer flex items-center gap-3 transition-all ${selectedGroupId === g.id ? 'active' : 'hover:bg-gray-50'}`;
+                item.onclick = () => selectGroup(g.id);
+                item.innerHTML = `
+                    <span class="material-icons opacity-70">${selectedGroupId === g.id ? 'folder_open' : 'folder'}</span>
+                    <span class="text-sm font-medium truncate">${g.name}</span>
+                `;
+                list.appendChild(item);
+            });
+        }
 
-            // Sync all variants
-            document.querySelectorAll('.variant-container').forEach(container => {
-                const wordsList = container.querySelector('.words-list');
-                const emptyState = container.querySelector('.empty-state');
-                const wordCount = container.querySelector('.word-count');
+        function selectGroup(id) {
+            selectedGroupId = id;
+            renderGroups();
+            updateView(id);
+            fetchWords();
+        }
 
-                wordsList.innerHTML = '';
-                wordCount.textContent = `${words.length}${t.countSuffix}`;
+        function updateView(id) {
+            const main = document.getElementById('mainContent');
+            const placeholder = document.getElementById('noSelection');
+            if (id) {
+                main.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+            } else {
+                main.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+            }
+        }
 
-                if (words.length === 0) {
-                    emptyState.classList.remove('hidden');
-                } else {
-                    emptyState.classList.add('hidden');
-                    words.forEach(item => {
-                        const word = item.word || item;
-                        const rule = item.rule || "-";
-                        const suggestion = item.suggestion || "-";
+        async function fetchWords() {
+            if (!selectedGroupId) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/ng-words?group_id=${selectedGroupId}`);
+                words = await res.json();
+                renderWords();
+                const group = groups.find(g => g.id === selectedGroupId);
+                document.getElementById('selectedGroupName').textContent = group ? group.name : '-';
+            } catch (err) {
+                console.error(err);
+            }
+        }
 
-                        const div = document.createElement('div');
-                        div.className = "grid grid-cols-12 gap-4 items-center px-6 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors";
-                        div.innerHTML = `
-                            <div class="col-span-3 text-sm font-semibold text-primary">${word}</div>
-                            <div class="col-span-3 text-xs text-slate-500 truncate" title="${rule}">${rule}</div>
-                            <div class="col-span-5 text-xs text-slate-600 line-clamp-2" title="${suggestion}">${suggestion}</div>
-                            <div class="col-span-1 flex items-center justify-end gap-1">
-                                <button onclick="openEditModal('${word}')" class="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-all">
-                                    <span class="material-symbols-outlined !text-[18px]">edit</span>
-                                </button>
-                                <button onclick="deleteWord('${word}')" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">
-                                    <span class="material-symbols-outlined !text-[18px]">delete</span>
-                                </button>
-                            </div>
-                        `;
-                        wordsList.appendChild(div);
-                    });
+        function renderWords() {
+            const t = TRANSLATIONS[currentLang];
+            const tbody = document.getElementById('wordsTableBody');
+            const empty = document.getElementById('emptyList');
+            const count = document.getElementById('wordCount');
+            
+            tbody.innerHTML = '';
+            count.textContent = `${words.length}${t.countSuffix}`;
+
+            if (words.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            
+            empty.classList.add('hidden');
+            words.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50/50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-bold text-indigo-600">${item.word}</td>
+                    <td class="px-6 py-4 text-xs text-gray-400">${item.rule || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">${item.suggestion || '-'}</td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <button onclick="openEditModal('${item.word}')" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                                <span class="material-icons text-sm">edit</span>
+                            </button>
+                            <button onclick="deleteWord('${item.word}')" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                <span class="material-icons text-sm">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        let customModalCallback = null;
+
+        function openCustomModal({ title, placeholder, initialValue, isConfirm, callback }) {
+            document.getElementById('customModalTitle').textContent = title;
+            document.getElementById('customModalInput').placeholder = placeholder || '';
+            document.getElementById('customModalInput').value = initialValue || '';
+            
+            const inputContainer = document.getElementById('customModalInputContainer');
+            const confirmBtn = document.getElementById('customModalConfirmBtn');
+            
+            if (isConfirm) {
+                inputContainer.classList.add('hidden');
+                confirmBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                confirmBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                inputContainer.classList.remove('hidden');
+                confirmBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                confirmBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+            
+            customModalCallback = callback;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            if (!isConfirm) document.getElementById('customModalInput').focus();
+        }
+
+        function closeCustomModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+            customModalCallback = null;
+        }
+
+        function handleCustomModalConfirm() {
+            if (customModalCallback) {
+                customModalCallback(document.getElementById('customModalInput').value);
+            }
+            closeCustomModal();
+        }
+
+        async function createNewGroup() {
+            const t = TRANSLATIONS[currentLang];
+            openCustomModal({
+                title: t.sidebar,
+                placeholder: t.groupNamePrompt,
+                callback: async (name) => {
+                    if (!name) return;
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/ng-words/groups`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name })
+                        });
+                        if (res.ok) {
+                            const newGroup = await res.json();
+                            groups.push(newGroup);
+                            renderGroups();
+                            selectGroup(newGroup.id);
+                            showToast(t.msgSave);
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error, true);
+                        }
+                    } catch (err) {
+                        showToast(t.msgError, true);
+                    }
                 }
             });
         }
 
-        async function addWord(variantId) {
-            const container = document.getElementById(variantId);
-            const word = container.querySelector('.new-word-input').value.trim();
-            const rule = container.querySelector('.new-rule-input').value.trim();
-            const suggestion = container.querySelector('.new-suggestion-input').value.trim();
+        async function renameCurrentGroup() {
+            const t = TRANSLATIONS[currentLang];
+            if (!selectedGroupId || selectedGroupId === 'default') return;
 
-            const t = translations[getCurrentLang()];
+            const group = groups.find(g => g.id === selectedGroupId);
+            openCustomModal({
+                title: t.modalTitle,
+                placeholder: t.renamePrompt,
+                initialValue: group ? group.name : "",
+                callback: async (name) => {
+                    if (!name || (group && name === group.name)) return;
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/ng-words/groups/${selectedGroupId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name })
+                        });
+                        if (res.ok) {
+                            const updatedGroup = await res.json();
+                            const idx = groups.findIndex(g => g.id === selectedGroupId);
+                            if (idx !== -1) groups[idx].name = updatedGroup.name;
+                            renderGroups();
+                            document.getElementById('selectedGroupName').textContent = updatedGroup.name;
+                            showToast(t.msgSave);
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error, true);
+                        }
+                    } catch (err) {
+                        showToast(t.msgError, true);
+                    }
+                }
+            });
+        }
 
-            if (!word) {
-                alert(t.inputRequired);
-                return;
-            }
+        async function deleteCurrentGroup() {
+            const t = TRANSLATIONS[currentLang];
+            if (!selectedGroupId || selectedGroupId === 'default') return;
+
+            openCustomModal({
+                title: t.confirmDelete,
+                isConfirm: true,
+                callback: async () => {
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/ng-words/groups/${selectedGroupId}`, { 
+                            method: 'DELETE' 
+                        });
+                        if (res.ok) {
+                            groups = groups.filter(g => g.id !== selectedGroupId);
+                            selectedGroupId = null;
+                            renderGroups();
+                            updateView(null);
+                            showToast(t.msgSave);
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error, true);
+                        }
+                    } catch (err) {
+                        showToast(t.msgError, true);
+                    }
+                }
+            });
+        }
+
+        async function addWord() {
+            const wordInput = document.getElementById('newWordInput');
+            const ruleInput = document.getElementById('newRuleInput');
+            const sugInput = document.getElementById('newSuggestionInput');
+            
+            const word = wordInput.value.trim();
+            if (!word) return;
 
             try {
-                const response = await fetch(API_BASE, {
+                const res = await fetch(`${API_BASE_URL}/api/ng-words`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ word, rule, suggestion })
+                    body: JSON.stringify({
+                        group_id: selectedGroupId,
+                        word,
+                        rule: ruleInput.value.trim(),
+                        suggestion: sugInput.value.trim()
+                    })
                 });
-
-                if (response.ok) {
-                    // Clear inputs in ALL variants
-                    document.querySelectorAll('.new-word-input').forEach(i => i.value = '');
-                    document.querySelectorAll('.new-rule-input').forEach(i => i.value = '');
-                    document.querySelectorAll('.new-suggestion-input').forEach(i => i.value = '');
+                if (res.ok) {
+                    wordInput.value = ''; ruleInput.value = ''; sugInput.value = '';
                     fetchWords();
+                    showToast("Added successfully");
                 } else {
-                    const err = await response.json();
-                    alert(err.error || t.errorAdd);
+                    const err = await res.json();
+                    showToast(err.error, true);
                 }
-            } catch (err) {
-                console.error("Add error:", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         async function deleteWord(word) {
-            const t = translations[getCurrentLang()];
-            if (!confirm(t.confirmDelete.replace('{word}', word))) return;
-
+            if (!confirm(TRANSLATIONS[currentLang].confirmDelete)) return;
             try {
-                const response = await fetch(API_BASE, {
+                await fetch(`${API_BASE_URL}/api/ng-words`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ word })
+                    body: JSON.stringify({ group_id: selectedGroupId, word })
                 });
-
-                if (response.ok) {
-                    fetchWords();
-                } else {
-                    alert(t.errorDelete);
-                }
-            } catch (err) {
-                console.error("Delete error:", err);
-            }
+                fetchWords();
+            } catch (err) { console.error(err); }
         }
 
         function openEditModal(word) {
-            const item = allWords.find(i => (i.word || i) === word);
+            const item = words.find(w => w.word === word);
             if (!item) return;
-
-            currentlyEditing = word;
-            document.getElementById('old-word-display').textContent = word;
-            document.getElementById('edit-word-input').value = word;
-            document.getElementById('edit-rule-input').value = item.rule || "";
-            document.getElementById('edit-suggestion-input').value = item.suggestion || "";
-
-            // Localize modal
-            const t = translations[getCurrentLang()];
-            document.querySelector('.modal-title').textContent = t.editTitle;
-            document.querySelector('.modal-label-old').textContent = t.labelOld;
-            document.querySelector('.modal-label-new').textContent = t.labelNew;
-            document.querySelector('.modal-label-rule').textContent = t.labelRule;
-            document.querySelector('.modal-label-suggestion').textContent = t.labelSuggestion;
-            document.querySelector('.modal-btn-cancel').textContent = t.btnCancel;
-            document.querySelector('.modal-btn-save').textContent = t.btnSave;
-
-            document.getElementById('edit-modal').classList.remove('hidden');
-            document.getElementById('edit-word-input').focus();
+            currentlyEditingWord = word;
+            document.getElementById('oldWordDisplay').textContent = word;
+            document.getElementById('editWordInput').value = word;
+            document.getElementById('editRuleInput').value = item.rule || '';
+            document.getElementById('editSuggestionInput').value = item.suggestion || '';
+            document.getElementById('editModal').classList.remove('hidden');
         }
 
-        // Global Event Delegation for Add Buttons
-        document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.add-word-btn');
-            if (btn) {
-                const variantContainer = btn.closest('.variant-container');
-                if (variantContainer) addWord(variantContainer.id);
-            }
-        });
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
 
-        document.getElementById('save-edit').addEventListener('click', async () => {
-            const newWord = document.getElementById('edit-word-input').value.trim();
-            const newRule = document.getElementById('edit-rule-input').value.trim();
-            const newSuggestion = document.getElementById('edit-suggestion-input').value.trim();
-
-            const t = translations[getCurrentLang()];
-
-            if (!newWord) {
-                alert(t.inputRequired);
-                return;
-            }
+        async function saveEdit() {
+            const newWord = document.getElementById('editWordInput').value.trim();
+            if (!newWord) return;
 
             try {
-                const response = await fetch(API_BASE, {
+                const res = await fetch(`${API_BASE_URL}/api/ng-words`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        old_word: currentlyEditing,
+                        group_id: selectedGroupId,
+                        old_word: currentlyEditingWord,
                         new_word: newWord,
-                        rule: newRule,
-                        suggestion: newSuggestion
+                        rule: document.getElementById('editRuleInput').value.trim(),
+                        suggestion: document.getElementById('editSuggestionInput').value.trim()
                     })
                 });
-
-                if (response.ok) {
-                    document.getElementById('edit-modal').classList.add('hidden');
+                if (res.ok) {
+                    closeEditModal();
                     fetchWords();
+                    showToast("Updated successfully");
                 } else {
-                    const err = await response.json();
-                    alert(err.error || t.errorEdit);
+                    const err = await res.json();
+                    showToast(err.error, true);
                 }
-            } catch (err) {
-                console.error("Edit error:", err);
-            }
-        });
+            } catch (err) { console.error(err); }
+        }
 
-        document.getElementById('close-modal').onclick = () => document.getElementById('edit-modal').classList.add('hidden');
-        document.getElementById('cancel-edit').onclick = () => document.getElementById('edit-modal').classList.add('hidden');
-
-        window.addEventListener('hashchange', () => {
-            renderWords(allWords);
-        });
-
-        // Initial Load
-        fetchWords();
+        // Init
+        loadGroups();
     </script>
 </body>
 

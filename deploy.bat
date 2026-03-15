@@ -42,6 +42,13 @@ set "ENV_VARS_FLAG="
 if not "%GEMINI_API_KEY%"=="" (
     set "ENV_VARS_FLAG=--set-env-vars=GEMINI_API_KEY=%GEMINI_API_KEY%"
 )
+if not "%GEMINI_MODEL%"=="" (
+    if "!ENV_VARS_FLAG!"=="" (
+        set "ENV_VARS_FLAG=--set-env-vars=GEMINI_MODEL=%GEMINI_MODEL%"
+    ) else (
+        set "ENV_VARS_FLAG=!ENV_VARS_FLAG!,GEMINI_MODEL=%GEMINI_MODEL%"
+    )
+)
 
 :: Using --quiet to avoid interactive prompts
 :: 수정된 부분: --platform managed 추가

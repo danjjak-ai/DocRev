@@ -2,7 +2,7 @@ import os
 import json
 import threading
 from werkzeug.utils import secure_filename
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import fitz  # PyMuPDF
 from google import genai
@@ -24,6 +24,17 @@ app = Flask(__name__)
 allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
 CORS(app, resources={r"/*": {"origins": allowed_origins}})
 
+# --- Static File Serving ---
+@app.route('/')
+def serve_index():
+    return send_from_directory('.', 'pdf_comment_workspace.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    if os.path.exists(os.path.join('.', path)):
+        return send_from_directory('.', path)
+    return jsonify({"error": "File not found"}), 404
+
 # Configure Gemini API
 # Load environment variables from .env file
 load_dotenv()
@@ -41,8 +52,7 @@ client = genai.Client(api_key=api_key)
 # Using Gemini Model from environment
 MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
-# Global variable for NG words
-NG_WORDS = []
+# NG word list is now handled per-group via load_ng_words()
 # Global variable for Prompts
 PROMPTS = {}
 
@@ -68,9 +78,10 @@ def get_analysis_status(job_id):
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
 
-def perform_analysis_logic(doc, mode, lang):
+def perform_analysis_logic(doc, mode, lang, ng_group_id="default", prompt_group_id="default", rag_group_id="default"):
     """Core analysis logic separated to be runnable in background."""
-    lang_prompts = PROMPTS.get(lang, PROMPTS.get('ko', {}))
+    prompts_data = load_prompts_for_group(prompt_group_id)
+    lang_prompts = prompts_data.get(lang, prompts_data.get('ko', {}))
     results = []
     
     # Extract text and images for multimodal analysis
@@ -121,10 +132,13 @@ def perform_analysis_logic(doc, mode, lang):
 
     # --- Level 1: Keyword Analysis (OCR + Text Search) ---
     if mode in ['level1', 'both']:
+        # Load NG words for the specific group
+        ng_words_list = load_ng_words(ng_group_id)
+        
         for page_num in range(processing_pages):
             page = doc.load_page(page_num)
             ng_meta = lang_prompts.get('ng_violation', PROMPTS.get('ko', {}).get('ng_violation', {}))
-            for ng_item in NG_WORDS:
+            for ng_item in ng_words_list:
                 word = ng_item.get("word")
                 rule = ng_item.get("rule", "")
                 suggestion = ng_item.get("suggestion", "")
@@ -315,143 +329,203 @@ def perform_analysis_logic(doc, mode, lang):
 
     return results
 
-def background_analysis_task(job_id, pdf_bytes, mode, lang):
+def background_analysis_task(job_id, pdf_bytes, mode, lang, ng_group_id="default", prompt_group_id="default", rag_group_id="default"):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        results = perform_analysis_logic(doc, mode, lang)
+        results = perform_analysis_logic(doc, mode, lang, ng_group_id, prompt_group_id, rag_group_id)
         update_job_status(job_id, "completed", results=results)
     except Exception as e:
         import traceback
         traceback.print_exc()
         update_job_status(job_id, "failed", error=str(e))
 
-# --- Configuration Paths ---
-# Use absolute paths based on script location for GCP compatibility
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-CONFIG_DIR = os.path.join(BASE_DIR, "config")
-PROMPTS_FILE = os.path.join(CONFIG_DIR, "prompts.json")
-NG_WORDS_FILE = os.path.join(CONFIG_DIR, "ng_words_dataset.json")
+# Global Variables and Configurations
+CONFIG_DIR = os.path.join(os.path.dirname(__file__), "config")
+PROMPTS_FILE = os.path.join(CONFIG_DIR, "prompts.json") # Legacy fallback
+NG_GROUPS_FILE = os.path.join(CONFIG_DIR, "ng_groups.json")
+NG_WORDS_BASE_DIR = os.path.join(CONFIG_DIR, "ng_words")
+PROMPT_GROUPS_FILE = os.path.join(CONFIG_DIR, "prompt_groups.json")
+PROMPTS_BASE_DIR = os.path.join(CONFIG_DIR, "prompts")
 
-def load_ng_words():
-    """
-    Loads NG words from config/ng_words_dataset.json.
-    Creates the file with default values if it doesn't exist.
-    """
-    global NG_WORDS
-    
-    if not os.path.exists(CONFIG_DIR):
-        try:
-            os.makedirs(CONFIG_DIR)
-            print(f"Created directory: {CONFIG_DIR}")
-        except Exception as e:
-            print(f"Error creating directory {CONFIG_DIR}: {e}")
-            return
-        
-    if not os.path.exists(NG_WORDS_FILE):
-        default_ng_words = [
-            {"word": "最高", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "'최고' 등 주관적인 최상급 표현을 피하고 객관적 데이터에 기반한 표현으로 수정하세요."},
-            {"word": "최고", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "'최고' 등 주관적인 최상급 표현을 피하고 객관적 데이터에 기반한 표현으로 수정하세요."},
-            {"word": "최상", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "'최상' 등 주관적인 최상급 표현을 피하고 객관적 데이터에 기반한 표현으로 수정하세요."},
-            {"word": "유일", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "근거 없는 '유일' 표현은 지양하고 공정한 비교 데이터를 제시하세요."},
-            {"word": "완치", "rule": "가이드라인 제1의3-(1)-② (안전성의 과신·부작용의 부정)", "suggestion": "'완치'와 같이 치료 효과를 보장하거나 과신하게 하는 표현은 금지되어 있습니다."},
-            {"word": "No.1", "rule": "가이드라인 제1의3-(2)-① (최상급 표현의 금지)", "suggestion": "근거 없이 순위를 강조하는 표현은 피하고 객관적인 증거를 제시하세요."},
-            {"word": "副作用なし", "rule": "가이드라인 제1의3-(1)-② (안전성의 과신·부작용의 부정)", "suggestion": "부작용이 없다는 식의 표현은 금지되어 있습니다. 적절한 부작용 정보와 안전성 데이터를 병기해 주세요."}
-        ]
-        try:
-            with open(NG_WORDS_FILE, "w", encoding="utf-8") as f:
-                json.dump(default_ng_words, f, ensure_ascii=False, indent=4)
-            print(f"Created default NG words file: {NG_WORDS_FILE}")
-        except Exception as e:
-            print(f"Error creating default NG words file: {e}")
-    
+os.makedirs(CONFIG_DIR, exist_ok=True)
+os.makedirs(NG_WORDS_BASE_DIR, exist_ok=True)
+os.makedirs(PROMPTS_BASE_DIR, exist_ok=True)
+
+# --- Initial setup for default group ---
+def init_default_config():
+    get_ng_groups() # Ensures ng_groups.json and default folder/file exist
+    get_rag_groups() # For RAG
+    get_prompt_groups() # For Prompts
+
+def get_prompt_groups():
+    if not os.path.exists(PROMPT_GROUPS_FILE):
+        default_groups = {"default": {"name": "기본 프롬프트", "id": "default"}}
+        with open(PROMPT_GROUPS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_groups, f, ensure_ascii=False, indent=4)
+        return default_groups
     try:
-        if os.path.exists(NG_WORDS_FILE):
-            with open(NG_WORDS_FILE, "r", encoding="utf-8") as f:
-                NG_WORDS = json.load(f)
-            print(f"Loaded {len(NG_WORDS)} NG words.")
+        with open(PROMPT_GROUPS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_prompt_groups(groups):
+    with open(PROMPT_GROUPS_FILE, "w", encoding="utf-8") as f:
+        json.dump(groups, f, ensure_ascii=False, indent=4)
+
+def get_prompts_file(group_id):
+    return os.path.join(PROMPTS_BASE_DIR, f"{group_id}.json")
+
+def load_prompts_for_group(group_id="default"):
+    file_path = get_prompts_file(group_id)
+    if not os.path.exists(file_path):
+        # Migrate old global file to default group if it exists
+        if group_id == "default" and os.path.exists(PROMPTS_FILE):
+            import shutil
+            shutil.copy(PROMPTS_FILE, file_path)
         else:
-            NG_WORDS = []
-    except Exception as e:
-        print(f"Error loading NG words: {e}")
-        NG_WORDS = [] # Fallback
-
-# Initial load
-load_ng_words()
-
-def load_prompts():
-    """
-    Loads prompts from config/prompts.json.
-    """
-    global PROMPTS
-    if os.path.exists(PROMPTS_FILE):
-        try:
-            with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
-                PROMPTS = json.load(f)
-            print(f"Loaded prompts for languages: {list(PROMPTS.keys())}")
-        except Exception as e:
-            print(f"Error loading prompts: {e}")
-            PROMPTS = {}
-    else:
-        print(f"WARNING: {PROMPTS_FILE} not found.")
-        PROMPTS = {}
-
-def save_prompts():
-    """
-    Saves the global PROMPTS dictionary back to config/prompts.json.
-    """
+            return {}
     try:
-        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(PROMPTS, f, ensure_ascii=False, indent=4)
-        return True
-    except Exception as e:
-        print(f"Error saving prompts: {e}")
-        return False
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
 
-load_prompts()
+def save_prompts_for_group(group_id, data):
+    file_path = get_prompts_file(group_id)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-def save_ng_words():
-    """
-    Saves the global NG_WORDS list back to config/ng_words_dataset.json.
-    """
+# PROMPTS is now loaded per-group when needed
+PROMPTS = {} # Still keep as global cache if needed, but per-group is preferred
+
+def get_ng_groups():
+    if not os.path.exists(NG_GROUPS_FILE):
+        default_groups = {"default": {"name": "기본 금지어", "id": "default"}}
+        with open(NG_GROUPS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_groups, f, ensure_ascii=False, indent=4)
+        return default_groups
     try:
-        with open(NG_WORDS_FILE, "w", encoding="utf-8") as f:
-            json.dump(NG_WORDS, f, ensure_ascii=False, indent=4)
-        return True
-    except Exception as e:
-        print(f"Error saving NG words: {e}")
-        return False
+        with open(NG_GROUPS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_ng_groups(groups):
+    with open(NG_GROUPS_FILE, "w", encoding="utf-8") as f:
+        json.dump(groups, f, ensure_ascii=False, indent=4)
+
+def get_ng_words_file(group_id):
+    return os.path.join(NG_WORDS_BASE_DIR, f"{group_id}.json")
+
+def load_ng_words(group_id="default"):
+    file_path = get_ng_words_file(group_id)
+    if not os.path.exists(file_path):
+        # Migrate old global file to default group if it exists
+        old_file = os.path.join(CONFIG_DIR, "ng_words_dataset.json")
+        if group_id == "default" and os.path.exists(old_file):
+            import shutil
+            shutil.move(old_file, file_path)
+        else:
+            return []
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_ng_words(group_id, words):
+    file_path = get_ng_words_file(group_id)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(words, f, ensure_ascii=False, indent=4)
+
+@app.route('/api/ng-words/groups', methods=['GET'])
+def list_ng_groups():
+    return jsonify(list(get_ng_groups().values()))
+
+@app.route('/api/ng-words/groups', methods=['POST'])
+def create_ng_group():
+    data = request.get_json()
+    name = data.get("name")
+    if not name:
+        return jsonify({"error": "Group name is required"}), 400
+    
+    groups = get_ng_groups()
+    group_id = str(uuid.uuid4())[:8]
+    groups[group_id] = {"id": group_id, "name": name}
+    save_ng_groups(groups)
+    
+    # Init empty file
+    save_ng_words(group_id, [])
+    
+    return jsonify(groups[group_id]), 201
+
+@app.route('/api/ng-words/groups/<group_id>', methods=['PATCH'])
+def rename_ng_group(group_id):
+    data = request.get_json()
+    new_name = data.get("name")
+    if not new_name:
+        return jsonify({"error": "New name is required"}), 400
+    
+    groups = get_ng_groups()
+    if group_id not in groups:
+        return jsonify({"error": "Group not found"}), 404
+    
+    groups[group_id]["name"] = new_name
+    save_ng_groups(groups)
+    return jsonify(groups[group_id])
+
+@app.route('/api/ng-words/groups/<group_id>', methods=['DELETE'])
+def delete_ng_group(group_id):
+    groups = get_ng_groups()
+    if group_id not in groups:
+        return jsonify({"error": "Group not found"}), 404
+    
+    if group_id == "default":
+        return jsonify({"error": "Cannot delete default group"}), 400
+
+    del groups[group_id]
+    save_ng_groups(groups)
+
+    # Clean up file
+    file_path = get_ng_words_file(group_id)
+    if os.path.exists(file_path): os.remove(file_path)
+
+    return jsonify({"message": "Group deleted successfully"})
 
 @app.route('/api/ng-words', methods=['GET'])
-def get_ng_words():
-    return jsonify(NG_WORDS)
+def get_ng_words_api():
+    group_id = request.args.get("group_id", "default")
+    return jsonify(load_ng_words(group_id))
 
 @app.route('/api/ng-words', methods=['POST'])
-def add_ng_word():
+def add_ng_word_api():
     data = request.get_json()
+    group_id = data.get("group_id", "default")
     word = data.get("word")
     rule = data.get("rule", "")
     suggestion = data.get("suggestion", "")
     
     if not word:
         return jsonify({"error": "No word provided"}), 400
-        
-    # Check if word already exists in the list of objects
-    if any(item.get("word") == word for item in NG_WORDS):
+    
+    words = load_ng_words(group_id)
+    if any(item.get("word") == word for item in words):
         return jsonify({"error": "Word already exists"}), 400
         
-    NG_WORDS.append({
+    words.append({
         "word": word,
         "rule": rule,
         "suggestion": suggestion
     })
     
-    if save_ng_words():
-        return jsonify({"message": "Word added successfully", "words": NG_WORDS}), 201
-    return jsonify({"error": "Failed to save changes"}), 500
+    save_ng_words(group_id, words)
+    return jsonify({"message": "Word added successfully", "words": words}), 201
 
 @app.route('/api/ng-words', methods=['PUT'])
-def update_ng_word():
+def update_ng_word_api():
     data = request.get_json()
+    group_id = data.get("group_id", "default")
     old_word = data.get("old_word")
     new_word = data.get("new_word")
     new_rule = data.get("rule", "")
@@ -460,9 +534,9 @@ def update_ng_word():
     if not old_word or not new_word:
         return jsonify({"error": "Both old_word and new_word are required"}), 400
         
-    # Find the index of the object with old_word
+    words = load_ng_words(group_id)
     target_idx = -1
-    for i, item in enumerate(NG_WORDS):
+    for i, item in enumerate(words):
         if item.get("word") == old_word:
             target_idx = i
             break
@@ -470,53 +544,111 @@ def update_ng_word():
     if target_idx == -1:
         return jsonify({"error": "Old word not found"}), 404
         
-    # Check if new_word already exists (if it's changing)
-    if new_word != old_word and any(item.get("word") == new_word for item in NG_WORDS):
+    if new_word != old_word and any(item.get("word") == new_word for item in words):
         return jsonify({"error": "New word already exists"}), 400
     
-    NG_WORDS[target_idx] = {
+    words[target_idx] = {
         "word": new_word,
         "rule": new_rule,
         "suggestion": new_suggestion
     }
     
-    if save_ng_words():
-        return jsonify({"message": "Word updated successfully", "words": NG_WORDS}), 200
-    return jsonify({"error": "Failed to save changes"}), 500
+    save_ng_words(group_id, words)
+    return jsonify({"message": "Word updated successfully", "words": words}), 200
 
 @app.route('/api/ng-words', methods=['DELETE'])
-def delete_ng_word():
+def delete_ng_word_api():
     data = request.get_json()
+    group_id = data.get("group_id", "default")
     word = data.get("word")
     if not word:
         return jsonify({"error": "No word provided"}), 400
         
-    global NG_WORDS
-    initial_len = len(NG_WORDS)
-    NG_WORDS = [item for item in NG_WORDS if item.get("word") != word]
+    words = load_ng_words(group_id)
+    initial_len = len(words)
+    words = [item for item in words if item.get("word") != word]
     
-    if len(NG_WORDS) == initial_len:
+    if len(words) == initial_len:
         return jsonify({"error": "Word not found"}), 404
         
-    if save_ng_words():
-        return jsonify({"message": "Word deleted successfully", "words": NG_WORDS}), 200
-    return jsonify({"error": "Failed to save changes"}), 500
+    save_ng_words(group_id, words)
+    return jsonify({"message": "Word deleted successfully", "words": words}), 200
+
+@app.route('/api/prompts/groups', methods=['GET'])
+def list_prompt_groups():
+    return jsonify(list(get_prompt_groups().values()))
+
+@app.route('/api/prompts/groups', methods=['POST'])
+def create_prompt_group():
+    data = request.get_json()
+    name = data.get("name")
+    if not name:
+        return jsonify({"error": "Group name is required"}), 400
+    
+    groups = get_prompt_groups()
+    group_id = str(uuid.uuid4())[:8]
+    groups[group_id] = {"id": group_id, "name": name}
+    save_prompt_groups(groups)
+    
+    # Init empty file or default prompts
+    save_prompts_for_group(group_id, {})
+    
+    return jsonify(groups[group_id]), 201
+
+@app.route('/api/prompts/groups/<group_id>', methods=['PATCH'])
+def rename_prompt_group(group_id):
+    data = request.get_json()
+    new_name = data.get("name")
+    if not new_name:
+        return jsonify({"error": "New name is required"}), 400
+    
+    groups = get_prompt_groups()
+    if group_id not in groups:
+        return jsonify({"error": "Group not found"}), 404
+    
+    groups[group_id]["name"] = new_name
+    save_prompt_groups(groups)
+    return jsonify(groups[group_id])
+
+@app.route('/api/prompts/groups/<group_id>', methods=['DELETE'])
+def delete_prompt_group(group_id):
+    groups = get_prompt_groups()
+    if group_id not in groups:
+        return jsonify({"error": "Group not found"}), 404
+    
+    if group_id == "default":
+        return jsonify({"error": "Cannot delete default group"}), 400
+
+    del groups[group_id]
+    save_prompt_groups(groups)
+
+    # Clean up file
+    file_path = get_prompts_file(group_id)
+    if os.path.exists(file_path): os.remove(file_path)
+
+    return jsonify({"message": "Group deleted successfully"})
 
 @app.route('/api/prompts', methods=['GET'])
-def get_prompts():
-    return jsonify(PROMPTS)
+def get_prompts_api():
+    group_id = request.args.get("group_id", "default")
+    return jsonify(load_prompts_for_group(group_id))
 
 @app.route('/api/prompts', methods=['POST'])
-def update_prompts():
-    global PROMPTS
+def update_prompts_api():
     data = request.get_json()
+    group_id = data.get("group_id", "default")
     if not data:
         return jsonify({"error": "No data provided"}), 400
     
-    PROMPTS = data
-    if save_prompts():
-        return jsonify({"message": "Prompts updated successfully"}), 200
-    return jsonify({"error": "Failed to save prompts"}), 500
+    # Remove group_id from actual prompts data before saving
+    # data_to_save = {k: v for k, v in data.items() if k != "group_id"}
+    # Note: frontend sends { "group_id": "...", "ko": {...}, "en": {...} }
+    # but we want to store it in a way load_prompts_for_group expects.
+    # Actually current frontend sends promptsData which is a dict of langs.
+    # Let's handle it carefully.
+    
+    save_prompts_for_group(group_id, data)
+    return jsonify({"message": "Prompts updated successfully"}), 200
 
 # Initialize RAG components
 # Use pkshatech/GLuCoSE-base-ja for superior Japanese support
@@ -527,9 +659,47 @@ vector_store = None
 bm25_retriever = None
 
 # Reference Document Configuration and State
-REF_DOCS_DIR = os.path.join(os.path.dirname(__file__), "config", "ReferenceDoc")
-os.makedirs(REF_DOCS_DIR, exist_ok=True)
-RAG_STATUS = {"is_running": False, "message": "", "files_processed": []}
+RAG_GROUPS_FILE = os.path.join(CONFIG_DIR, "rag_groups.json")
+REF_DOCS_BASE_DIR = os.path.join(CONFIG_DIR, "ReferenceDoc")
+PERSIST_BASE_DIR = os.path.join(CONFIG_DIR, "vector_store")
+
+os.makedirs(REF_DOCS_BASE_DIR, exist_ok=True)
+os.makedirs(PERSIST_BASE_DIR, exist_ok=True)
+
+# Format: { "group_id": { "is_running": False, "message": "", "files_processed": [] } }
+RAG_STATUS_MAP = {}
+
+def get_rag_groups():
+    if not os.path.exists(RAG_GROUPS_FILE):
+        # Create default group if it doesn't exist
+        default_groups = {"default": {"name": "기본 그룹", "id": "default"}}
+        with open(RAG_GROUPS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_groups, f, ensure_ascii=False, indent=4)
+        return default_groups
+    try:
+        with open(RAG_GROUPS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_rag_groups(groups):
+    with open(RAG_GROUPS_FILE, "w", encoding="utf-8") as f:
+        json.dump(groups, f, ensure_ascii=False, indent=4)
+
+def get_group_dir(group_id):
+    path = os.path.join(REF_DOCS_BASE_DIR, group_id)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def get_persist_dir(group_id):
+    path = os.path.join(PERSIST_BASE_DIR, group_id)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def get_group_status(group_id):
+    if group_id not in RAG_STATUS_MAP:
+        RAG_STATUS_MAP[group_id] = {"is_running": False, "message": "", "files_processed": []}
+    return RAG_STATUS_MAP[group_id]
 
 def normalize_japanese_text(text):
     """Normalizes Japanese text to NFC and handles full-width/half-width conversions."""
@@ -612,12 +782,72 @@ def robust_search_for_quote(page, quote):
 
     return results
 
+@app.route('/api/rag/groups', methods=['GET'])
+def list_rag_groups():
+    return jsonify(list(get_rag_groups().values()))
+
+@app.route('/api/rag/groups', methods=['POST'])
+def create_rag_group():
+    data = request.get_json()
+    name = data.get("name")
+    if not name:
+        return jsonify({"error": "Group name is required"}), 400
+    
+    groups = get_rag_groups()
+    group_id = str(uuid.uuid4())[:8]
+    groups[group_id] = {"id": group_id, "name": name}
+    save_rag_groups(groups)
+    
+    # Pre-create directories
+    get_group_dir(group_id)
+    get_persist_dir(group_id)
+    
+    return jsonify(groups[group_id]), 201
+
+@app.route('/api/rag/groups/<group_id>', methods=['PATCH'])
+def rename_rag_group(group_id):
+    data = request.get_json()
+    new_name = data.get("name")
+    if not new_name:
+        return jsonify({"error": "New name is required"}), 400
+    
+    groups = get_rag_groups()
+    if group_id not in groups:
+        return jsonify({"error": "Group not found"}), 404
+    
+    groups[group_id]["name"] = new_name
+    save_rag_groups(groups)
+    return jsonify(groups[group_id])
+
+@app.route('/api/rag/groups/<group_id>', methods=['DELETE'])
+def delete_rag_group(group_id):
+    groups = get_rag_groups()
+    if group_id not in groups:
+        return jsonify({"error": "Group not found"}), 404
+    
+    if group_id == "default":
+        return jsonify({"error": "Cannot delete default group"}), 400
+
+    del groups[group_id]
+    save_rag_groups(groups)
+
+    # Clean up files
+    import shutil
+    group_dir = os.path.join(REF_DOCS_BASE_DIR, group_id)
+    persist_dir = os.path.join(PERSIST_BASE_DIR, group_id)
+    if os.path.exists(group_dir): shutil.rmtree(group_dir)
+    if os.path.exists(persist_dir): shutil.rmtree(persist_dir)
+
+    return jsonify({"message": "Group deleted successfully"})
+
 @app.route('/api/reference-docs', methods=['GET'])
 def list_reference_docs():
+    group_id = request.args.get("group_id", "default")
+    group_dir = get_group_dir(group_id)
     files = []
-    if os.path.exists(REF_DOCS_DIR):
-        for f in os.listdir(REF_DOCS_DIR):
-            if f.lower().endswith('.pdf'):
+    if os.path.exists(group_dir):
+        for f in os.listdir(group_dir):
+            if f.lower().endswith(('.pdf', '.txt', '.md', '.xml')):
                 files.append(f)
     return jsonify(files)
 
@@ -626,25 +856,21 @@ def upload_reference_doc():
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
     files = request.files.getlist('file')
+    group_id = request.form.get("group_id", "default")
+    group_dir = get_group_dir(group_id)
+
     if not files:
         return jsonify({"error": "No selected files"}), 400
     
     uploaded_files = []
     errors = []
     for file in files:
-        if file.filename == '':
-            continue
-        if not file.filename.lower().endswith('.pdf'):
-            errors.append(f"File {file.filename} is not a PDF")
-            continue
+        if file.filename == '': continue
         
         filename = secure_filename(file.filename)
-        file_path = os.path.join(REF_DOCS_DIR, filename)
+        file_path = os.path.join(group_dir, filename)
         file.save(file_path)
         uploaded_files.append(filename)
-    
-    if errors and not uploaded_files:
-        return jsonify({"error": "No valid PDF files were uploaded", "details": errors}), 400
     
     return jsonify({
         "message": f"Successfully uploaded {len(uploaded_files)} files", 
@@ -654,8 +880,10 @@ def upload_reference_doc():
 
 @app.route('/api/reference-docs/<filename>', methods=['DELETE'])
 def delete_reference_doc(filename):
+    group_id = request.args.get("group_id", "default")
+    group_dir = get_group_dir(group_id)
     safe_filename = secure_filename(filename)
-    file_path = os.path.join(REF_DOCS_DIR, safe_filename)
+    file_path = os.path.join(group_dir, safe_filename)
     if os.path.exists(file_path):
         os.remove(file_path)
         return jsonify({"message": f"Successfully deleted {safe_filename}"}), 200
@@ -663,11 +891,12 @@ def delete_reference_doc(filename):
 
 @app.route('/api/rag/status', methods=['GET'])
 def get_rag_status():
-    global RAG_STATUS
-    return jsonify(RAG_STATUS)
+    group_id = request.args.get("group_id", "default")
+    return jsonify(get_group_status(group_id))
 
-def reconstruct_rag_task():
-    global vector_store, bm25_retriever, RAG_STATUS
+def reconstruct_rag_task(group_id):
+    global RAG_STATUS_MAP
+    status = get_group_status(group_id)
     try:
         documents = []
         text_splitter = RecursiveCharacterTextSplitter(
@@ -677,12 +906,14 @@ def reconstruct_rag_task():
             separators=["\n\n", "\n", "。", "！", "？", " ", ""]
         )
         files_processed = []
+        group_dir = get_group_dir(group_id)
+        persist_dir = get_persist_dir(group_id)
 
-        if os.path.exists(REF_DOCS_DIR):
-            for root, dirs, files in os.walk(REF_DOCS_DIR):
+        if os.path.exists(group_dir):
+            for root, dirs, files in os.walk(group_dir):
                 for filename in files:
                     file_path = os.path.join(root, filename)
-                    rel_path = os.path.relpath(file_path, REF_DOCS_DIR)
+                    rel_path = os.path.relpath(file_path, group_dir)
                     
                     if filename.lower().endswith('.pdf'):
                         doc = fitz.open(file_path)
@@ -693,63 +924,59 @@ def reconstruct_rag_task():
                             for chunk in chunks:
                                 documents.append(Document(
                                     page_content=chunk,
-                                    metadata={"page": page_num + 1, "doc_id": rel_path}
+                                    metadata={"page": page_num + 1, "doc_id": rel_path, "group_id": group_id}
                                 ))
                         files_processed.append(rel_path)
                     
                     elif filename.lower().endswith(('.xml', '.txt', '.md')):
                         try:
                             with open(file_path, "r", encoding="utf-8") as f:
-                                # Simple reading for now, could be improved with BS4 for XML
                                 text = f.read()
                                 chunks = text_splitter.split_text(text)
                                 for chunk in chunks:
                                     documents.append(Document(
                                         page_content=chunk,
-                                        metadata={"doc_id": rel_path}
+                                        metadata={"doc_id": rel_path, "group_id": group_id}
                                     ))
                             files_processed.append(rel_path)
                         except Exception as read_err:
                             print(f"Error reading {file_path}: {read_err}")
         
         if documents:
-            vector_store = Chroma.from_documents(
+            # Create group-specific vector store
+            Chroma.from_documents(
                 documents=documents, 
                 embedding=embeddings,
-                persist_directory=PERSIST_DIR
+                persist_directory=persist_dir
             )
-            # Initialize BM25 for hybrid search
-            bm25_retriever = BM25Retriever.from_documents(
-                documents,
-                preprocess_func=tokenize_japanese_simple
-            )
-            RAG_STATUS["message"] = f"RAG 재구성이 완료되었습니다. (총 {len(documents)}개 청크 생성)"
+            status["message"] = f"RAG 재구성이 완료되었습니다. (그룹: {group_id}, 총 {len(documents)}개 청크)"
         else:
-            vector_store = None
-            bm25_retriever = None
-            RAG_STATUS["message"] = "참조 문서가 없어 RAG 데이터베이스를 초기화했습니다."
+            status["message"] = f"참조 문서가 없어 RAG 데이터베이스를 초기화했습니다. (그룹: {group_id})"
             
-        RAG_STATUS["files_processed"] = files_processed
+        status["files_processed"] = files_processed
     except Exception as e:
-        RAG_STATUS["message"] = f"RAG 재구성 중 오류 발생: {str(e)}"
+        status["message"] = f"RAG 재구성 중 오류 발생: {str(e)}"
     finally:
-        RAG_STATUS["is_running"] = False
+        status["is_running"] = False
 
 @app.route('/api/rag/reconstruct', methods=['POST'])
 def trigger_rag_reconstruction():
-    global RAG_STATUS
-    if RAG_STATUS["is_running"]:
-        return jsonify({"error": "RAG reconstruction is already running"}), 409
+    data = request.get_json() or {}
+    group_id = data.get("group_id", "default")
+    status = get_group_status(group_id)
     
-    RAG_STATUS["is_running"] = True
-    RAG_STATUS["message"] = "RAG 재구성을 시작했습니다..."
-    RAG_STATUS["files_processed"] = []
+    if status["is_running"]:
+        return jsonify({"error": f"RAG reconstruction for group {group_id} is already running"}), 409
     
-    thread = threading.Thread(target=reconstruct_rag_task)
+    status["is_running"] = True
+    status["message"] = f"RAG 재구성을 시작했습니다... (그룹: {group_id})"
+    status["files_processed"] = []
+    
+    thread = threading.Thread(target=reconstruct_rag_task, args=(group_id,))
     thread.daemon = True
     thread.start()
     
-    return jsonify({"message": "RAG reconstruction started"}), 202
+    return jsonify({"message": "RAG reconstruction started", "group_id": group_id}), 202
 
 
 EXPERT_REVIEW_GUIDELINE = """
@@ -792,40 +1019,51 @@ def index_pdf_text(doc_id, pages_text_list):
     
     print(f"Indexed {len(documents)} chunks from document {doc_id}.")
 
-def retrieve_relevant_context(query, k=5):
+def retrieve_relevant_context(query, group_id="default", k=5):
     """
-    Retrieves the most relevant chunks using Hybrid Search (Vector + BM25).
+    Retrieves the most relevant chunks from a specific group's vector store.
     """
-    if vector_store is None:
+    persist_dir = get_persist_dir(group_id)
+    if not os.path.exists(persist_dir) or not os.listdir(persist_dir):
         return []
+
+    try:
+        # Load the store for this specific group
+        group_store = Chroma(
+            persist_directory=persist_dir,
+            embedding_function=embeddings
+        )
         
-    # Vector search
-    vector_results = vector_store.similarity_search(query, k=k)
-    
-    # BM25 search
-    bm25_results = []
-    if bm25_retriever:
-        bm25_retriever.k = k
-        bm25_results = bm25_retriever.get_relevant_documents(query)
-    
-    # Simple Reciprocal Rank Fusion or duplicate removal
-    seen = set()
-    combined = []
-    
-    # Combine results, prioritizing vector search for now
-    for doc in vector_results:
-        content_hash = hash(doc.page_content)
-        if content_hash not in seen:
-            combined.append(doc)
-            seen.add(content_hash)
-            
-    for doc in bm25_results:
-        content_hash = hash(doc.page_content)
-        if content_hash not in seen:
-            combined.append(doc)
-            seen.add(content_hash)
-            
-    return combined[:int(k)]
+        # Vector search
+        vector_results = group_store.similarity_search(query, k=k)
+        
+        # BM25 search
+        bm25_results = []
+        if bm25_retriever:
+            bm25_retriever.k = k
+            bm25_results = bm25_retriever.get_relevant_documents(query)
+        
+        # Simple Reciprocal Rank Fusion or duplicate removal
+        seen = set()
+        combined = []
+        
+        # Combine results, prioritizing vector search
+        for doc in vector_results:
+            content_hash = hash(doc.page_content)
+            if content_hash not in seen:
+                combined.append(doc)
+                seen.add(content_hash)
+                
+        for doc in bm25_results:
+            content_hash = hash(doc.page_content)
+            if content_hash not in seen:
+                combined.append(doc)
+                seen.add(content_hash)
+                
+        return combined[:int(k)]
+    except Exception as e:
+        print(f"Error retrieving from group {group_id}: {e}")
+        return []
 
 def expand_query_with_gemini(query, lang='ko'):
     """Uses Gemini to expand the search query for better RAG retrieval."""
@@ -867,6 +1105,9 @@ def upload_pdf():
     job_id = str(uuid.uuid4())
     mode = request.form.get('mode', 'both')
     lang = request.form.get('lang', 'ko')
+    ng_group_id = request.form.get('ng_group_id', 'default')
+    prompt_group_id = request.form.get('prompt_group_id', 'default')
+    rag_group_id = request.form.get('rag_group_id', 'default')
     
     # Store bytes in memory for the background thread
     pdf_bytes = file.read()
@@ -875,7 +1116,7 @@ def upload_pdf():
     update_job_status(job_id, "pending")
     threading.Thread(
         target=background_analysis_task, 
-        args=(job_id, pdf_bytes, mode, lang), 
+        args=(job_id, pdf_bytes, mode, lang, ng_group_id, prompt_group_id, rag_group_id), 
         daemon=True
     ).start()
 
@@ -893,7 +1134,11 @@ def chat_with_document():
         
     try:
         lang = data.get("lang", "ko")
-        lang_prompts = PROMPTS.get(lang, PROMPTS.get('ko', {}))
+        prompt_group_id = data.get("prompt_group_id", "default")
+        rag_group_id = data.get("rag_group_id", "default")
+        
+        prompts_data = load_prompts_for_group(prompt_group_id)
+        lang_prompts = prompts_data.get(lang, prompts_data.get('ko', {}))
         chat_prompt_template = lang_prompts.get('chat', "")
 
         if not chat_prompt_template:
@@ -901,7 +1146,7 @@ def chat_with_document():
 
         # 1. 문서에서 관련 컨텍스트 검색 (Query Expansion 적용)
         expanded_query = expand_query_with_gemini(query, lang=lang)
-        relevant_docs = retrieve_relevant_context(expanded_query, k=7)
+        relevant_docs = retrieve_relevant_context(expanded_query, group_id=rag_group_id, k=7)
         context = "\n\n".join([f"[Context]: {d.page_content}" for d in relevant_docs])
 
         # 2. Gemini에게 문서 기반 답변 요청
@@ -996,6 +1241,8 @@ def ask_question():
     except Exception as e:
         print(f"Error in retriever: {e}")
         return jsonify({"error": str(e)}), 500
+
+init_default_config()
 
 if __name__ == '__main__':
     port = int(os.environ.get("FLASK_PORT", 5000))

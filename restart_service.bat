@@ -9,6 +9,18 @@ echo [DocRev] Cleaning up existing processes...
 taskkill /F /IM python.exe 2>nul
 taskkill /F /IM pythonw.exe 2>nul
 
+echo [DocRev] Checking environment variables...
+if not exist ".env" (
+    echo [WARNING] .env file not found. AI features may not work.
+    echo Please create a .env file based on .env.example.
+)
+
+echo [DocRev] Initializing configuration directories...
+if not exist "config" mkdir config
+if not exist "config\ng_words" mkdir config\ng_words
+if not exist "config\prompts" mkdir config\prompts
+if not exist "config\ReferenceDoc" mkdir config\ReferenceDoc
+
 echo [DocRev] Checking virtual environment...
 if not exist ".venv" (
     echo [DocRev] Creating virtual environment...
@@ -16,7 +28,7 @@ if not exist ".venv" (
 )
 
 echo [DocRev] Ensuring dependencies...
-.\.venv\Scripts\python.exe -m pip install flask flask-cors pymupdf google-genai langchain langchain-community chromadb sentence-transformers langchain-huggingface langchain-chroma langchain-text-splitters python-dotenv --quiet
+.\.venv\Scripts\python.exe -m pip install flask flask-cors pymupdf google-genai langchain langchain-community chromadb sentence-transformers langchain-huggingface langchain-chroma langchain-text-splitters python-dotenv gunicorn --quiet
 
 echo [DocRev] Opening Application...
 start "" "pdf_comment_workspace.html"

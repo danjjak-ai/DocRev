@@ -2381,7 +2381,16 @@
                                             renderAnnotationList();
 
                                             // Group Selection Logic
-                                            const fetchGroupLists = async () => {
+                                            const fetchGroupLists = async (retries = 3) => {
+                                                const selectors = ['.select-rag-group', '.select-ng-group', '.select-prompt-group'];
+                                                
+                                                // Show loading state
+                                                selectors.forEach(selector => {
+                                                    document.querySelectorAll(selector).forEach(select => {
+                                                        select.innerHTML = `<option value="">데이터 로딩 중...</option>`;
+                                                    });
+                                                });
+
                                                 try {
                                                     const [ragRes, ngRes, promptRes] = await Promise.all([
                                                         fetch(API_BASE_URL + '/api/rag/groups'),
@@ -2389,13 +2398,22 @@
                                                         fetch(API_BASE_URL + '/api/prompts/groups')
                                                     ]);
 
+                                                    if (!ragRes.ok || !ngRes.ok || !promptRes.ok) {
+                                                        throw new Error('API response was not ok');
+                                                    }
+
                                                     const ragGroups = await ragRes.json();
                                                     const ngGroups = await ngRes.json();
                                                     const promptGroups = await promptRes.json();
 
-                                                    const populateSelects = (selectors, groups) => {
-                                                        document.querySelectorAll(selectors).forEach(select => {
+                                                    const populateSelects = (sel, groups) => {
+                                                        document.querySelectorAll(sel).forEach(select => {
                                                             const currentValue = select.value;
+                                                            if (groups.length === 0) {
+                                                                select.innerHTML = '<option value="default">기본 그룹 (Default)</option>';
+                                                                select.value = 'default';
+                                                                return;
+                                                            }
                                                             select.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
                                                             if (currentValue && groups.find(g => g.id === currentValue)) {
                                                                 select.value = currentValue;
@@ -2410,7 +2428,22 @@
                                                     populateSelects('.select-prompt-group', promptGroups);
 
                                                 } catch (err) {
-                                                    console.error('Error fetching group lists:', err);
+                                                    console.error(`Error fetching group lists (${retries} retries left):`, err);
+                                                    if (retries > 0) {
+                                                        // Fallback UI text to wait
+                                                        selectors.forEach(selector => {
+                                                            document.querySelectorAll(selector).forEach(select => {
+                                                                select.innerHTML = `<option value="">재시도 중 (${retries})...</option>`;
+                                                            });
+                                                        });
+                                                        setTimeout(() => fetchGroupLists(retries - 1), 3000);
+                                                    } else {
+                                                         selectors.forEach(selector => {
+                                                            document.querySelectorAll(selector).forEach(select => {
+                                                                select.innerHTML = `<option value="">로드 실패 (새로고침 요망)</option>`;
+                                                            });
+                                                        });
+                                                    }
                                                 }
                                             };
 

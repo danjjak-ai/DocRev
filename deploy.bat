@@ -51,12 +51,13 @@ if not "%GEMINI_MODEL%"=="" (
 )
 
 :: Using --quiet to avoid interactive prompts
-:: 수정된 부분: --platform managed 추가
+:: 수정된 부분: --platform managed 및 --min-instances 1 추가 (콜드 스타트 방지)
 call gcloud run deploy %SERVICE_NAME% ^
   --source . ^
   --region %REGION% ^
   --platform managed ^
   --allow-unauthenticated ^
+  --min-instances 1 ^
   %ENV_VARS_FLAG% ^
   --quiet
 

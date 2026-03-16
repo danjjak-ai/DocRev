@@ -35,6 +35,16 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+:: 1.5. Prepare GCS Bucket (Option B - Persistent Storage)
+set "BUCKET_NAME=%PROJECT_ID%-config"
+echo [Step 1.5] Preparing GCS Bucket: gs://%BUCKET_NAME%...
+:: Try to create the bucket, ignore if it exists
+call gsutil mb -l %REGION% gs://%BUCKET_NAME% 2>nul
+
+echo [Step 1.6] Syncing local config to GCS bucket...
+:: Upload local config files so Cloud Run has initial data
+call gsutil -m rsync -r config gs://%BUCKET_NAME%/config
+
 :: 2. Deploy to Cloud Run
 echo [Step 2] Deploying Backend to Cloud Run...
 :: Build environment variables string
@@ -51,13 +61,16 @@ if not "%GEMINI_MODEL%"=="" (
 )
 
 :: Using --quiet to avoid interactive prompts
-:: 수정된 부분: --platform managed 및 --min-instances 1 추가 (콜드 스타트 방지)
+:: --min-instances 1: 콜드 스타트 방지
+:: --add-volume / --add-mount: GCS 버킷을 /app/config 에 마운트 (Option B)
 call gcloud run deploy %SERVICE_NAME% ^
   --source . ^
   --region %REGION% ^
   --platform managed ^
   --allow-unauthenticated ^
   --min-instances 1 ^
+  --add-volume=name=config-volume,type=cloud-storage,bucket=%BUCKET_NAME% ^
+  --add-mount=volume=config-volume,mount-path=/app/config ^
   %ENV_VARS_FLAG% ^
   --quiet
 
@@ -78,10 +91,12 @@ echo [Info] Backend Service URL: %SERVICE_URL%
 
 :: 4. Update config.js
 echo [Step 4] Updating config.js with new Service URL...
-:: We use powershell to safely replace the URL in config.js
-powershell -Command "$url='%SERVICE_URL%'; (Get-Content config.js) -replace 'https://.*\.run\.app', $url | Set-Content config.js"
-:: Fallback if no matching run.app URL found (initial replacement)
-powershell -Command "if (!(Select-String -Path config.js -Pattern '%SERVICE_URL%')) { (Get-Content config.js) -replace '(?<=: '').*(?='';)', '%SERVICE_URL%' | Set-Content config.js }"
+:: We use multiple replacements to ensure the URL is updated whether it was localhost or an old Cloud Run URL
+powershell -Command "^
+    $content = Get-Content config.js; ^
+    $content = $content -replace 'https://.*\.run\.app', '%SERVICE_URL%'; ^
+    $content = $content -replace 'http://localhost:5000', '%SERVICE_URL%'; ^
+    $content | Set-Content config.js"
 
 :: Build Tailwind CSS
 echo [Step 4.5] Building Tailwind CSS...

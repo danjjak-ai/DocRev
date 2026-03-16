@@ -62,7 +62,7 @@ if not "%GEMINI_MODEL%"=="" (
 
 :: Using --quiet to avoid interactive prompts
 :: --min-instances 1: 콜드 스타트 방지
-:: --add-volume / --add-mount: GCS 버킷을 /app/config 에 마운트 (Option B)
+:: --add-volume / --add-volume-mount: GCS 버킷을 /app/config 에 마운트 (Option B)
 call gcloud run deploy %SERVICE_NAME% ^
   --source . ^
   --region %REGION% ^
@@ -70,7 +70,7 @@ call gcloud run deploy %SERVICE_NAME% ^
   --allow-unauthenticated ^
   --min-instances 1 ^
   --add-volume=name=config-volume,type=cloud-storage,bucket=%BUCKET_NAME% ^
-  --add-mount=volume=config-volume,mount-path=/app/config ^
+  --add-volume-mount=volume=config-volume,mount-path=/app/config ^
   %ENV_VARS_FLAG% ^
   --quiet
 

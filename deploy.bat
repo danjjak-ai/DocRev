@@ -91,12 +91,8 @@ echo [Info] Backend Service URL: %SERVICE_URL%
 
 :: 4. Update config.js
 echo [Step 4] Updating config.js with new Service URL...
-:: We use multiple replacements to ensure the URL is updated whether it was localhost or an old Cloud Run URL
-powershell -Command "^
-    $content = Get-Content config.js; ^
-    $content = $content -replace 'https://.*\.run\.app', '%SERVICE_URL%'; ^
-    $content = $content -replace 'http://localhost:5000', '%SERVICE_URL%'; ^
-    $content | Set-Content config.js"
+:: We use PowerShell to update the API URL in config.js (handles both localhost and previous Cloud Run URLs)
+powershell -Command "(Get-Content config.js) -replace 'https://.*\.run\.app', '%SERVICE_URL%' -replace 'http://localhost:5000', '%SERVICE_URL%' | Set-Content config.js"
 
 :: Build Tailwind CSS
 echo [Step 4.5] Building Tailwind CSS...

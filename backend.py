@@ -650,9 +650,16 @@ def update_prompts_api():
     save_prompts_for_group(group_id, data)
     return jsonify({"message": "Prompts updated successfully"}), 200
 
-# Initialize RAG components
-# Use pkshatech/GLuCoSE-base-ja for superior Japanese support
-embeddings = HuggingFaceEmbeddings(model_name="pkshatech/GLuCoSE-base-ja")
+# Lazy load embeddings only when needed to speed up startup for group listing API
+_embeddings_instance = None
+def get_embeddings():
+    global _embeddings_instance
+    if _embeddings_instance is None:
+        print("INFO: Loading HuggingFaceEmbeddings model (this may take a few seconds)...")
+        _embeddings_instance = HuggingFaceEmbeddings(model_name="pkshatech/GLuCoSE-base-ja")
+        print("INFO: HuggingFaceEmbeddings model loaded.")
+    return _embeddings_instance
+
 # Use persistent ChromaDB
 PERSIST_DIR = os.path.join(os.path.dirname(__file__), "config", "vector_store")
 vector_store = None
@@ -946,7 +953,7 @@ def reconstruct_rag_task(group_id):
             # Create group-specific vector store
             Chroma.from_documents(
                 documents=documents, 
-                embedding=embeddings,
+                embedding=get_embeddings(),
                 persist_directory=persist_dir
             )
             status["message"] = f"RAG 재구성이 완료되었습니다. (그룹: {group_id}, 총 {len(documents)}개 청크)"
@@ -1012,7 +1019,7 @@ def index_pdf_text(doc_id, pages_text_list):
     if vector_store is None:
         vector_store = Chroma.from_documents(
             documents=documents,
-            embedding=embeddings
+            embedding=get_embeddings()
         )
     else:
         vector_store.add_documents(documents)
@@ -1031,7 +1038,7 @@ def retrieve_relevant_context(query, group_id="default", k=5):
         # Load the store for this specific group
         group_store = Chroma(
             persist_directory=persist_dir,
-            embedding_function=embeddings
+            embedding_function=get_embeddings()
         )
         
         # Vector search

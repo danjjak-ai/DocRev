@@ -2384,12 +2384,37 @@
                                             const fetchGroupLists = async (retries = 3) => {
                                                 const selectors = ['.select-rag-group', '.select-ng-group', '.select-prompt-group'];
                                                 
-                                                // Show loading state
-                                                selectors.forEach(selector => {
-                                                    document.querySelectorAll(selector).forEach(select => {
-                                                        select.innerHTML = `<option value="">데이터 로딩 중...</option>`;
+                                                const populateSelects = (sel, groups) => {
+                                                    document.querySelectorAll(sel).forEach(select => {
+                                                        const currentValue = select.value;
+                                                        if (!groups || groups.length === 0) {
+                                                            select.innerHTML = '<option value="default">기본 그룹 (Default)</option>';
+                                                            select.value = 'default';
+                                                            return;
+                                                        }
+                                                        select.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                                                        if (currentValue && groups.find(g => g.id === currentValue)) {
+                                                            select.value = currentValue;
+                                                        } else if (groups.length > 0) {
+                                                            select.value = groups[0].id;
+                                                        }
                                                     });
-                                                });
+                                                };
+
+                                                // 1. 초기 데이터 즉시 로딩 (Zero-delay UI)
+                                                if (typeof INITIAL_GROUPS !== 'undefined') {
+                                                    populateSelects('.select-rag-group', INITIAL_GROUPS.rag);
+                                                    populateSelects('.select-ng-group', INITIAL_GROUPS.ng);
+                                                    populateSelects('.select-prompt-group', INITIAL_GROUPS.prompt);
+                                                    console.log('Initial groups populated from config.js');
+                                                } else {
+                                                    // Show loading state if INITIAL_GROUPS missing
+                                                    selectors.forEach(selector => {
+                                                        document.querySelectorAll(selector).forEach(select => {
+                                                            select.innerHTML = `<option value="">데이터 로딩 중...</option>`;
+                                                        });
+                                                    });
+                                                }
 
                                                 try {
                                                     const [ragRes, ngRes, promptRes] = await Promise.all([
@@ -2406,28 +2431,14 @@
                                                     const ngGroups = await ngRes.json();
                                                     const promptGroups = await promptRes.json();
 
-                                                    const populateSelects = (sel, groups) => {
-                                                        document.querySelectorAll(sel).forEach(select => {
-                                                            const currentValue = select.value;
-                                                            if (groups.length === 0) {
-                                                                select.innerHTML = '<option value="default">기본 그룹 (Default)</option>';
-                                                                select.value = 'default';
-                                                                return;
-                                                            }
-                                                            select.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-                                                            if (currentValue && groups.find(g => g.id === currentValue)) {
-                                                                select.value = currentValue;
-                                                            } else if (groups.length > 0) {
-                                                                select.value = groups[0].id;
-                                                            }
-                                                        });
-                                                    };
-
+                                                    // 2. API에서 최신 데이터로 업데이트
                                                     populateSelects('.select-rag-group', ragGroups);
                                                     populateSelects('.select-ng-group', ngGroups);
                                                     populateSelects('.select-prompt-group', promptGroups);
+                                                    console.log('Groups updated from Backend API');
 
                                                 } catch (err) {
+
                                                     console.error(`Error fetching group lists (${retries} retries left):`, err);
                                                     if (retries > 0) {
                                                         // Fallback UI text to wait

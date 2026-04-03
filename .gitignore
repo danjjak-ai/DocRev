@@ -1,12 +1,23 @@
 # Node modules
 node_modules/
 
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# GitHub Workflows
+.github/workflows/
+
 # Firebase
 .firebase/
 *-debug.log
 
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Virtual environment
 .venv/
@@ -14,10 +25,16 @@ env/
 venv/
 ENV/
 
-# Python cache
+# Python cache & build
 **/__pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
 
 # Database and RAG Data
 chroma_db/
@@ -25,6 +42,10 @@ config/vector_store/*
 config/ReferenceDoc/*
 !config/vector_store/.gitkeep
 !config/ReferenceDoc/.gitkeep
+
+# Project specific temporary/test files
+dummy.pdf
+pdf_comment_workspace.png
 
 # OS specific
 .DS_Store

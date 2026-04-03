@@ -51,3 +51,11 @@ pdf_comment_workspace.png
 .DS_Store
 Thumbs.db
 *.log
+
+# Firebase configuration & project files
+.firebaserc
+firebase.json
+
+# Internal Documentation
+arch.md
+research.md

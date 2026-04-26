@@ -358,16 +358,22 @@ def init_default_config():
     get_prompt_groups() # For Prompts
 
 def get_prompt_groups():
-    if not os.path.exists(PROMPT_GROUPS_FILE):
-        default_groups = {"default": {"name": "기본 프롬프트", "id": "default"}}
-        with open(PROMPT_GROUPS_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_groups, f, ensure_ascii=False, indent=4)
-        return default_groups
-    try:
-        with open(PROMPT_GROUPS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
+    groups = {}
+    if os.path.exists(PROMPT_GROUPS_FILE):
+        try:
+            with open(PROMPT_GROUPS_FILE, "r", encoding="utf-8") as f:
+                groups = json.load(f)
+        except:
+            pass
+    
+    if "default" not in groups:
+        groups["default"] = {"id": "default", "name": "기본 프롬프트 (Default)"}
+        save_prompt_groups(groups)
+    
+    # Ensure default is first
+    ordered = {"default": groups.pop("default")}
+    ordered.update(groups)
+    return ordered
 
 def save_prompt_groups(groups):
     with open(PROMPT_GROUPS_FILE, "w", encoding="utf-8") as f:
@@ -400,16 +406,22 @@ def save_prompts_for_group(group_id, data):
 PROMPTS = {} # Still keep as global cache if needed, but per-group is preferred
 
 def get_ng_groups():
-    if not os.path.exists(NG_GROUPS_FILE):
-        default_groups = {"default": {"name": "기본 금지어", "id": "default"}}
-        with open(NG_GROUPS_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_groups, f, ensure_ascii=False, indent=4)
-        return default_groups
-    try:
-        with open(NG_GROUPS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
+    groups = {}
+    if os.path.exists(NG_GROUPS_FILE):
+        try:
+            with open(NG_GROUPS_FILE, "r", encoding="utf-8") as f:
+                groups = json.load(f)
+        except:
+            pass
+    
+    if "default" not in groups:
+        groups["default"] = {"id": "default", "name": "기본 금지어 (Default)"}
+        save_ng_groups(groups)
+        
+    # Ensure default is first
+    ordered = {"default": groups.pop("default")}
+    ordered.update(groups)
+    return ordered
 
 def save_ng_groups(groups):
     with open(NG_GROUPS_FILE, "w", encoding="utf-8") as f:
@@ -677,17 +689,22 @@ os.makedirs(PERSIST_BASE_DIR, exist_ok=True)
 RAG_STATUS_MAP = {}
 
 def get_rag_groups():
-    if not os.path.exists(RAG_GROUPS_FILE):
-        # Create default group if it doesn't exist
-        default_groups = {"default": {"name": "기본 그룹", "id": "default"}}
-        with open(RAG_GROUPS_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_groups, f, ensure_ascii=False, indent=4)
-        return default_groups
-    try:
-        with open(RAG_GROUPS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
+    groups = {}
+    if os.path.exists(RAG_GROUPS_FILE):
+        try:
+            with open(RAG_GROUPS_FILE, "r", encoding="utf-8") as f:
+                groups = json.load(f)
+        except:
+            pass
+    
+    if "default" not in groups:
+        groups["default"] = {"id": "default", "name": "기본 그룹 (Default)"}
+        save_rag_groups(groups)
+        
+    # Ensure default is first
+    ordered = {"default": groups.pop("default")}
+    ordered.update(groups)
+    return ordered
 
 def save_rag_groups(groups):
     with open(RAG_GROUPS_FILE, "w", encoding="utf-8") as f:

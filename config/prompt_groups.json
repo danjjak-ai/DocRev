@@ -10,5 +10,9 @@
     "e7ed39b1": {
         "id": "e7ed39b1",
         "name": "ddddd"
+    },
+    "default": {
+        "id": "default",
+        "name": "기본 프롬프트 (Default)"
     }
 }

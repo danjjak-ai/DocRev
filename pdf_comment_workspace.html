@@ -2008,7 +2008,12 @@
                                                     suggestionLabel: '제안',
                                                     pageLabel: '페이지',
                                                     pageFormat: '{page} 페이지',
-                                                    pageLimitReached: '내용이 {limit}페이지를 초과하여, 처음 {limit}페이지까지만 표시 및 분석됩니다.'
+                                                    pageLimitReached: '내용이 {limit}페이지를 초과하여, 처음 {limit}페이지까지만 표시 및 분석됩니다.',
+                                                    defaultRagName: '기본 그룹',
+                                                    defaultNgName: '기본 금지어',
+                                                    defaultPromptName: '기본 프롬프트',
+                                                    loadingGroups: '데이터 로딩 중...',
+                                                    retryingGroups: '재시도 중 ({retries})...'
                                                 },
                                                 
                                                 ja: {
@@ -2039,7 +2044,12 @@
                                                     suggestionLabel: '提案',
                                                     pageLabel: 'ページ',
                                                     pageFormat: '{page} ページ',
-                                                    pageLimitReached: 'ドキュメントが{limit}ページを超えています。最初の{limit}ページのみが表示および分析されます。'
+                                                    pageLimitReached: 'ドキュメントが{limit}ページを超えています。最初の{limit}ページのみが表示および分析されます。',
+                                                    defaultRagName: '基本グループ',
+                                                    defaultNgName: '基本禁止用語',
+                                                    defaultPromptName: '基本プロンプト',
+                                                    loadingGroups: 'データ読み込み中...',
+                                                    retryingGroups: '再試行中 ({retries})...'
                                                 },
                                                 en: {
                                                     chatTitle: 'Document Q&A',
@@ -2069,7 +2079,12 @@
                                                     catUrgent: 'Urgent',
                                                     aiReviewLabel: 'AI Review',
                                                     suggestionLabel: 'Suggestion',
-                                                    pageLimitReached: 'The document exceeds {limit} pages. Only the first {limit} pages will be displayed and analyzed.'
+                                                    pageLimitReached: 'The document exceeds {limit} pages. Only the first {limit} pages will be displayed and analyzed.',
+                                                    defaultRagName: 'Default Group',
+                                                    defaultNgName: 'Default NG Words',
+                                                    defaultPromptName: 'Default Prompt',
+                                                    loadingGroups: 'Loading data...',
+                                                    retryingGroups: 'Retrying ({retries})...'
                                                 }
                                             };
 
@@ -2376,6 +2391,8 @@
                                             chatInput.addEventListener('keypress', (e) => {
                                                 if (e.key === 'Enter') handleChatSend();
                                             });
+                                            
+                                            chatSendBtn.addEventListener('click', handleChatSend);
 
                                             // Initialize empty annotation list
                                             renderAnnotationList();
@@ -2385,14 +2402,32 @@
                                                 const selectors = ['.select-rag-group', '.select-ng-group', '.select-prompt-group'];
                                                 
                                                 const populateSelects = (sel, groups) => {
+                                                    const lang = getCurrentLang();
+                                                    const t = translations[lang] || translations['ko'];
+                                                    
                                                     document.querySelectorAll(sel).forEach(select => {
                                                         const currentValue = select.value;
                                                         if (!groups || groups.length === 0) {
-                                                            select.innerHTML = '<option value="default">기본 그룹 (Default)</option>';
+                                                            let defaultName = t.defaultRagName;
+                                                            if (sel.includes('ng')) defaultName = t.defaultNgName;
+                                                            if (sel.includes('prompt')) defaultName = t.defaultPromptName;
+                                                            
+                                                            select.innerHTML = `<option value="default">${defaultName} (Default)</option>`;
                                                             select.value = 'default';
                                                             return;
                                                         }
-                                                        select.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                                                        
+                                                        select.innerHTML = groups.map(g => {
+                                                            let displayName = g.name;
+                                                            if (g.id === 'default') {
+                                                                if (sel.includes('rag')) displayName = t.defaultRagName;
+                                                                else if (sel.includes('ng')) displayName = t.defaultNgName;
+                                                                else if (sel.includes('prompt')) displayName = t.defaultPromptName;
+                                                                displayName += " (Default)";
+                                                            }
+                                                            return `<option value="${g.id}">${displayName}</option>`;
+                                                        }).join('');
+                                                        
                                                         if (currentValue && groups.find(g => g.id === currentValue)) {
                                                             select.value = currentValue;
                                                         } else if (groups.length > 0) {
@@ -2409,27 +2444,27 @@
                                                     console.log('Initial groups populated from config.js');
                                                 } else {
                                                     // Show loading state if INITIAL_GROUPS missing
+                                                    const lang = getCurrentLang();
+                                                    const t = translations[lang] || translations['ko'];
                                                     selectors.forEach(selector => {
                                                         document.querySelectorAll(selector).forEach(select => {
-                                                            select.innerHTML = `<option value="">데이터 로딩 중...</option>`;
+                                                            select.innerHTML = `<option value="">${t.loadingGroups}</option>`;
                                                         });
                                                     });
                                                 }
 
                                                 try {
-                                                    const [ragRes, ngRes, promptRes] = await Promise.all([
-                                                        fetch(API_BASE_URL + '/api/rag/groups'),
-                                                        fetch(API_BASE_URL + '/api/ng-words/groups'),
-                                                        fetch(API_BASE_URL + '/api/prompts/groups')
+                                                    const fetchData = async (url) => {
+                                                        const res = await fetch(API_BASE_URL + url);
+                                                        if (!res.ok) throw new Error(`Fetch failed: ${url}`);
+                                                        return res.json();
+                                                    };
+
+                                                    const [ragGroups, ngGroups, promptGroups] = await Promise.all([
+                                                        fetchData('/api/rag/groups'),
+                                                        fetchData('/api/ng-words/groups'),
+                                                        fetchData('/api/prompts/groups')
                                                     ]);
-
-                                                    if (!ragRes.ok || !ngRes.ok || !promptRes.ok) {
-                                                        throw new Error('API response was not ok');
-                                                    }
-
-                                                    const ragGroups = await ragRes.json();
-                                                    const ngGroups = await ngRes.json();
-                                                    const promptGroups = await promptRes.json();
 
                                                     // 2. API에서 최신 데이터로 업데이트
                                                     populateSelects('.select-rag-group', ragGroups);
@@ -2438,26 +2473,29 @@
                                                     console.log('Groups updated from Backend API');
 
                                                 } catch (err) {
-
                                                     console.error(`Error fetching group lists (${retries} retries left):`, err);
+                                                    const lang = getCurrentLang();
+                                                    const t = translations[lang] || translations['ko'];
                                                     if (retries > 0) {
                                                         // Fallback UI text to wait
                                                         selectors.forEach(selector => {
                                                             document.querySelectorAll(selector).forEach(select => {
-                                                                select.innerHTML = `<option value="">재시도 중 (${retries})...</option>`;
+                                                                select.innerHTML = `<option value="">${t.retryingGroups.replace('{retries}', retries)}</option>`;
                                                             });
                                                         });
                                                         setTimeout(() => fetchGroupLists(retries - 1), 3000);
                                                     } else {
-                                                         selectors.forEach(selector => {
-                                                            document.querySelectorAll(selector).forEach(select => {
-                                                                select.innerHTML = `<option value="">로드 실패 (새로고침 요망)</option>`;
-                                                            });
-                                                        });
+                                                        // 로드 실패 시 디폴트 값 설정 (기존 INITIAL_GROUPS 또는 빈 배열)
+                                                        console.warn('All retries failed. Setting default groups.');
+                                                        const ragFallback = (typeof INITIAL_GROUPS !== 'undefined') ? INITIAL_GROUPS.rag : [];
+                                                        const ngFallback = (typeof INITIAL_GROUPS !== 'undefined') ? INITIAL_GROUPS.ng : [];
+                                                        const promptFallback = (typeof INITIAL_GROUPS !== 'undefined') ? INITIAL_GROUPS.prompt : [];
+                                                        
+                                                        populateSelects('.select-rag-group', ragFallback);
+                                                        populateSelects('.select-ng-group', ngFallback);
+                                                        populateSelects('.select-prompt-group', promptFallback);
                                                     }
                                                 }
-                                            };
-
                                             // Sync selections across variants
                                             document.addEventListener('change', (e) => {
                                                 if (e.target.classList.contains('select-rag-group')) {

@@ -10,5 +10,9 @@
     "5e1ce10f": {
         "id": "5e1ce10f",
         "name": "Test NG Group"
+    },
+    "default": {
+        "id": "default",
+        "name": "기본 금지어 (Default)"
     }
 }

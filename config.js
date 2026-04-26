@@ -1,5 +1,5 @@
 // API Configuration
-// For local development, use https://docrev-backend-m2gy5tp2kq-du.a.run.app
+// For local development, use http://localhost:5000
 // For production, replace with your Cloud Run URL after deployment
 const API_BASE_URL = window.ENV_BACKEND_URL || (
     (
@@ -16,18 +16,13 @@ const API_BASE_URL = window.ENV_BACKEND_URL || (
 
 const INITIAL_GROUPS = {
     rag: [
-        {"id": "guideline", "name": "医療用医薬品�E販売惁E��提供活動に関するガイドライン"},
-        {"id": "d5e058f4", "name": "Test RAG Group"}
+        {"id": "default", "name": "기본 그룹 (Default)"}
     ],
     ng: [
-        {"id": "guideline", "name": "医療用医薬品E},
-        {"id": "e1a09f22", "name": "医療用医薬品�E販売惁E��提供活勁E},
-        {"id": "5e1ce10f", "name": "Test NG Group"}
+        {"id": "default", "name": "기본 금지어 (Default)"}
     ],
     prompt: [
-        {"id": "guideline", "name": "医療用医薬品�E販売惁E��提供活勁E},
-        {"id": "3d5ac013", "name": "Test Prompt Group"},
-        {"id": "e7ed39b1", "name": "ddddd"}
+        {"id": "default", "name": "기본 프롬프트 (Default)"}
     ]
 };
 

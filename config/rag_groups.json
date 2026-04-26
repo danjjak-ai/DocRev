@@ -6,5 +6,9 @@
     "d5e058f4": {
         "id": "d5e058f4",
         "name": "Test RAG Group"
+    },
+    "default": {
+        "id": "default",
+        "name": "기본 그룹 (Default)"
     }
 }

@@ -1,5 +1,5 @@
 // API Configuration
-// For local development, use http://localhost:5000
+// For local development, use https://docrev-backend-m2gy5tp2kq-du.a.run.app
 // For production, replace with your Cloud Run URL after deployment
 const API_BASE_URL = window.ENV_BACKEND_URL || (
     (
@@ -16,13 +16,13 @@ const API_BASE_URL = window.ENV_BACKEND_URL || (
 
 const INITIAL_GROUPS = {
     rag: [
-        {"id": "default", "name": "Í∏∞Î≥∏ Í∑∏Î£π (Default)"}
+        {"id": "default", "name": "ÅE∞ÅE∏ ÅE∏ÅEπ (Default)"}
     ],
     ng: [
-        {"id": "default", "name": "Í∏∞Î≥∏ Í∏àÏßÄÏñ¥ (Default)"}
+        {"id": "default", "name": "ÅE∞ÅE∏ ÅEàÏßÄÅE¥ (Default)"}
     ],
     prompt: [
-        {"id": "default", "name": "Í∏∞Î≥∏ ÌîÑÎ°¨ÌîÑÌä∏ (Default)"}
+        {"id": "default", "name": "ÅE∞ÅE∏ ˙∞ÅE°¨˙∞ÅEä∏ (Default)"}
     ]
 };
 

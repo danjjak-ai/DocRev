@@ -165,8 +165,8 @@ def perform_analysis_logic(doc, mode, lang, ng_group_id="default", prompt_group_
         try:
             for page_num in range(processing_pages):
                 page = doc.load_page(page_num)
-                # Convert page to high-res image (300 DPI)
-                pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+                # Convert page to mid-res image (150 DPI) for optimal performance and token usage
+                pix = page.get_pixmap(matrix=fitz.Matrix(150/72, 150/72))
                 img_bytes = pix.tobytes("png")
                 gemini_input_parts.append({
                     "mime_type": "image/png",
@@ -330,6 +330,7 @@ def perform_analysis_logic(doc, mode, lang, ng_group_id="default", prompt_group_
     return results
 
 def background_analysis_task(job_id, pdf_bytes, mode, lang, ng_group_id="default", prompt_group_id="default", rag_group_id="default"):
+    doc = None
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         results = perform_analysis_logic(doc, mode, lang, ng_group_id, prompt_group_id, rag_group_id)
@@ -338,6 +339,12 @@ def background_analysis_task(job_id, pdf_bytes, mode, lang, ng_group_id="default
         import traceback
         traceback.print_exc()
         update_job_status(job_id, "failed", error=str(e))
+    finally:
+        if doc is not None:
+            try:
+                doc.close()
+            except:
+                pass
 
 # Global Variables and Configurations
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "config")
@@ -675,7 +682,7 @@ def get_embeddings():
 # Use persistent ChromaDB
 PERSIST_DIR = os.path.join(os.path.dirname(__file__), "config", "vector_store")
 vector_store = None
-bm25_retriever = None
+RAG_BM25_MAP = {}
 
 # Reference Document Configuration and State
 RAG_GROUPS_FILE = os.path.join(CONFIG_DIR, "rag_groups.json")
@@ -687,6 +694,7 @@ os.makedirs(PERSIST_BASE_DIR, exist_ok=True)
 
 # Format: { "group_id": { "is_running": False, "message": "", "files_processed": [] } }
 RAG_STATUS_MAP = {}
+rag_status_lock = threading.Lock()
 
 def get_rag_groups():
     groups = {}
@@ -721,9 +729,10 @@ def get_persist_dir(group_id):
     return path
 
 def get_group_status(group_id):
-    if group_id not in RAG_STATUS_MAP:
-        RAG_STATUS_MAP[group_id] = {"is_running": False, "message": "", "files_processed": []}
-    return RAG_STATUS_MAP[group_id]
+    with rag_status_lock:
+        if group_id not in RAG_STATUS_MAP:
+            RAG_STATUS_MAP[group_id] = {"is_running": False, "message": "", "files_processed": []}
+        return RAG_STATUS_MAP[group_id]
 
 def normalize_japanese_text(text):
     """Normalizes Japanese text to NFC and handles full-width/half-width conversions."""
@@ -940,16 +949,21 @@ def reconstruct_rag_task(group_id):
                     rel_path = os.path.relpath(file_path, group_dir)
                     
                     if filename.lower().endswith('.pdf'):
-                        doc = fitz.open(file_path)
-                        for page_num in range(len(doc)):
-                            page = doc.load_page(page_num)
-                            text = page.get_text()
-                            chunks = text_splitter.split_text(text)
-                            for chunk in chunks:
-                                documents.append(Document(
-                                    page_content=chunk,
-                                    metadata={"page": page_num + 1, "doc_id": rel_path, "group_id": group_id}
-                                ))
+                        doc = None
+                        try:
+                            doc = fitz.open(file_path)
+                            for page_num in range(len(doc)):
+                                page = doc.load_page(page_num)
+                                text = page.get_text()
+                                chunks = text_splitter.split_text(text)
+                                for chunk in chunks:
+                                    documents.append(Document(
+                                        page_content=chunk,
+                                        metadata={"page": page_num + 1, "doc_id": rel_path, "group_id": group_id}
+                                    ))
+                        finally:
+                            if doc is not None:
+                                doc.close()
                         files_processed.append(rel_path)
                     
                     elif filename.lower().endswith(('.xml', '.txt', '.md')):
@@ -973,28 +987,47 @@ def reconstruct_rag_task(group_id):
                 embedding=get_embeddings(),
                 persist_directory=persist_dir
             )
-            status["message"] = f"RAG 재구성이 완료되었습니다. (그룹: {group_id}, 총 {len(documents)}개 청크)"
-        else:
-            status["message"] = f"참조 문서가 없어 RAG 데이터베이스를 초기화했습니다. (그룹: {group_id})"
             
-        status["files_processed"] = files_processed
+            # Reconstruct BM25Retriever for this group
+            try:
+                RAG_BM25_MAP[group_id] = BM25Retriever.from_documents(
+                    documents=documents,
+                    preprocess_func=tokenize_japanese_simple
+                )
+                print(f"INFO: BM25Retriever initialized for group {group_id} with {len(documents)} documents.")
+            except Exception as bm25_err:
+                print(f"WARNING: Failed to initialize BM25Retriever for group {group_id}: {bm25_err}")
+                
+            with rag_status_lock:
+                status["message"] = f"RAG 재구성이 완료되었습니다. (그룹: {group_id}, 총 {len(documents)}개 청크)"
+        else:
+            if group_id in RAG_BM25_MAP:
+                del RAG_BM25_MAP[group_id]
+            with rag_status_lock:
+                status["message"] = f"참조 문서가 없어 RAG 데이터베이스를 초기화했습니다. (그룹: {group_id})"
+            
+        with rag_status_lock:
+            status["files_processed"] = files_processed
     except Exception as e:
-        status["message"] = f"RAG 재구성 중 오류 발생: {str(e)}"
+        with rag_status_lock:
+            status["message"] = f"RAG 재구성 중 오류 발생: {str(e)}"
     finally:
-        status["is_running"] = False
+        with rag_status_lock:
+            status["is_running"] = False
 
 @app.route('/api/rag/reconstruct', methods=['POST'])
 def trigger_rag_reconstruction():
     data = request.get_json() or {}
     group_id = data.get("group_id", "default")
-    status = get_group_status(group_id)
     
-    if status["is_running"]:
-        return jsonify({"error": f"RAG reconstruction for group {group_id} is already running"}), 409
-    
-    status["is_running"] = True
-    status["message"] = f"RAG 재구성을 시작했습니다... (그룹: {group_id})"
-    status["files_processed"] = []
+    with rag_status_lock:
+        status = get_group_status(group_id)
+        if status["is_running"]:
+            return jsonify({"error": f"RAG reconstruction for group {group_id} is already running"}), 409
+        
+        status["is_running"] = True
+        status["message"] = f"RAG 재구성을 시작했습니다... (그룹: {group_id})"
+        status["files_processed"] = []
     
     thread = threading.Thread(target=reconstruct_rag_task, args=(group_id,))
     thread.daemon = True
@@ -1043,9 +1076,48 @@ def index_pdf_text(doc_id, pages_text_list):
     
     print(f"Indexed {len(documents)} chunks from document {doc_id}.")
 
+def get_bm25_retriever(group_id):
+    """
+    Lazy loads the BM25Retriever for a specific group using documents stored in its Chroma vector store.
+    """
+    global RAG_BM25_MAP
+    if group_id in RAG_BM25_MAP:
+        return RAG_BM25_MAP[group_id]
+        
+    persist_dir = get_persist_dir(group_id)
+    if not os.path.exists(persist_dir) or not os.listdir(persist_dir):
+        return None
+        
+    try:
+        group_store = Chroma(
+            persist_directory=persist_dir,
+            embedding_function=get_embeddings()
+        )
+        db_data = group_store.get()
+        if db_data and db_data.get("documents"):
+            documents = []
+            for i in range(len(db_data["documents"])):
+                metadata = db_data["metadatas"][i] if db_data.get("metadatas") else {}
+                documents.append(Document(
+                    page_content=db_data["documents"][i],
+                    metadata=metadata
+                ))
+            
+            retriever = BM25Retriever.from_documents(
+                documents=documents,
+                preprocess_func=tokenize_japanese_simple
+            )
+            RAG_BM25_MAP[group_id] = retriever
+            print(f"INFO: Lazy loaded BM25Retriever for group {group_id} with {len(documents)} documents.")
+            return retriever
+    except Exception as e:
+        print(f"WARNING: Error lazy loading BM25Retriever for group {group_id}: {e}")
+        
+    return None
+
 def retrieve_relevant_context(query, group_id="default", k=5):
     """
-    Retrieves the most relevant chunks from a specific group's vector store.
+    Retrieves the most relevant chunks from a specific group's vector store using hybrid Vector + BM25 search.
     """
     persist_dir = get_persist_dir(group_id)
     if not os.path.exists(persist_dir) or not os.listdir(persist_dir):
@@ -1063,9 +1135,10 @@ def retrieve_relevant_context(query, group_id="default", k=5):
         
         # BM25 search
         bm25_results = []
-        if bm25_retriever:
-            bm25_retriever.k = k
-            bm25_results = bm25_retriever.get_relevant_documents(query)
+        bm25_ret = get_bm25_retriever(group_id)
+        if bm25_ret:
+            bm25_ret.k = int(k)
+            bm25_results = bm25_ret.get_relevant_documents(query)
         
         # Simple Reciprocal Rank Fusion or duplicate removal
         seen = set()

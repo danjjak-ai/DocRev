@@ -1,4 +1,8 @@
 {
+    "default": {
+        "id": "default",
+        "name": "기본 그룹 (Default)"
+    },
     "guideline": {
         "id": "guideline",
         "name": "医療用医薬品の販売情報提供活動に関するガイドライン"
@@ -7,8 +11,8 @@
         "id": "d5e058f4",
         "name": "Test RAG Group"
     },
-    "default": {
-        "id": "default",
-        "name": "기본 그룹 (Default)"
+    "ef9f5b33": {
+        "id": "ef9f5b33",
+        "name": "Test RAG Group"
     }
 }

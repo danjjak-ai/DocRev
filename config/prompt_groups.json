@@ -1,4 +1,8 @@
 {
+    "default": {
+        "id": "default",
+        "name": "기본 프롬프트 (Default)"
+    },
     "guideline": {
         "id": "guideline",
         "name": "医療用医薬品の販売情報提供活動"
@@ -11,8 +15,8 @@
         "id": "e7ed39b1",
         "name": "ddddd"
     },
-    "default": {
-        "id": "default",
-        "name": "기본 프롬프트 (Default)"
+    "f3b0bfd2": {
+        "id": "f3b0bfd2",
+        "name": "Test Prompt Group"
     }
 }

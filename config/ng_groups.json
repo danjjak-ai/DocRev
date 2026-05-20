@@ -1,4 +1,8 @@
 {
+    "default": {
+        "id": "default",
+        "name": "기본 금지어 (Default)"
+    },
     "guideline": {
         "id": "guideline",
         "name": "医療用医薬品"
@@ -11,8 +15,8 @@
         "id": "5e1ce10f",
         "name": "Test NG Group"
     },
-    "default": {
-        "id": "default",
-        "name": "기본 금지어 (Default)"
+    "3794a746": {
+        "id": "3794a746",
+        "name": "Test NG Group"
     }
 }

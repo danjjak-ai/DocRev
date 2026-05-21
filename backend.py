@@ -15,8 +15,6 @@ from langchain_core.documents import Document
 import unicodedata
 import re
 import uuid
-import base64
-import io
 from langchain_community.retrievers import BM25Retriever
 
 app = Flask(__name__)
@@ -53,8 +51,6 @@ client = genai.Client(api_key=api_key)
 MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
 # NG word list is now handled per-group via load_ng_words()
-# Global variable for Prompts
-PROMPTS = {}
 
 # --- Async Job Infrastructure ---
 analysis_jobs = {}
@@ -82,6 +78,9 @@ def perform_analysis_logic(doc, mode, lang, ng_group_id="default", prompt_group_
     """Core analysis logic separated to be runnable in background."""
     prompts_data = load_prompts_for_group(prompt_group_id)
     lang_prompts = prompts_data.get(lang, prompts_data.get('ko', {}))
+    default_prompts = load_prompts_for_group("default")
+    default_ko = default_prompts.get('ko', {})
+    default_en = default_prompts.get('en', {})
     results = []
     
     # Extract text and images for multimodal analysis
@@ -137,7 +136,7 @@ def perform_analysis_logic(doc, mode, lang, ng_group_id="default", prompt_group_
         
         for page_num in range(processing_pages):
             page = doc.load_page(page_num)
-            ng_meta = lang_prompts.get('ng_violation', PROMPTS.get('ko', {}).get('ng_violation', {}))
+            ng_meta = lang_prompts.get('ng_violation', default_ko.get('ng_violation', {}))
             for ng_item in ng_words_list:
                 word = ng_item.get("word")
                 rule = ng_item.get("rule", "")
@@ -182,7 +181,7 @@ def perform_analysis_logic(doc, mode, lang, ng_group_id="default", prompt_group_
             # 2. Gemini에게 문서 분석 요청
             review_prompt_template = lang_prompts.get('review', "")
             if not review_prompt_template:
-                review_prompt_template = PROMPTS.get('en', {}).get('review', "")
+                review_prompt_template = default_en.get('review', "") or default_ko.get('review', "")
             
             if review_prompt_template:
                 # Add multimodal context to prompt

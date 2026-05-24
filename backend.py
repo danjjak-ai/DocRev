@@ -359,6 +359,28 @@ os.makedirs(PROMPTS_BASE_DIR, exist_ok=True)
 
 # --- Initial setup for default group ---
 def init_default_config():
+    import shutil
+    seed_dir = os.path.join(os.path.dirname(__file__), "seed_data")
+    
+    # Check if config is empty or missing key files
+    if not os.path.exists(NG_GROUPS_FILE) or not os.path.exists(RAG_GROUPS_FILE):
+        if os.path.exists(seed_dir):
+            print("INFO: Initial environment detected. Seeding data from seed_data...")
+            try:
+                for item in os.listdir(seed_dir):
+                    s = os.path.join(seed_dir, item)
+                    d = os.path.join(CONFIG_DIR, item)
+                    if os.path.isdir(s):
+                        if not os.path.exists(d):
+                            shutil.copytree(s, d)
+                        else:
+                            shutil.copytree(s, d, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(s, d)
+                print("INFO: Seeding completed successfully.")
+            except Exception as e:
+                print(f"ERROR: Failed to seed data: {e}")
+
     get_ng_groups() # Ensures ng_groups.json and default folder/file exist
     get_rag_groups() # For RAG
     get_prompt_groups() # For Prompts
